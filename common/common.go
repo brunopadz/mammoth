@@ -14,27 +14,6 @@ limitations under the License.
 
 package common
 
-import (
-	"net"
-)
-
-const (
-	NODE_ROLE_MASTER  string = "master"
-	NODE_ROLE_REPLICA string = "replica"
-)
-
-type Node struct {
-	HostPort string            `mapstructure:"hostport"` //remote host:port
-	Role     string            `mapstructure:"role"`
-	Metadata map[string]string `mapstructure:"metadata"`
-	Healthy  bool              `mapstructure:"-"`
-}
-
-type Pool struct {
-	Channel     chan int   `mapstructure:"-"`
-	Connections []net.Conn `mapstructure:"-"`
-}
-
 type SSLConfig struct {
 	Enable        bool   `mapstructure:"enable"`
 	SSLMode       string `mapstructure:"sslmode"`

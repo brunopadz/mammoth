@@ -39,11 +39,6 @@ func init() {
 
 	crunchyproxyCmd.AddCommand(
 		startCmd,
-		stopCmd,
-		nodeCmd,
-		statsCmd,
-		healthCmd,
-		versionCmd,
 	)
 }
 

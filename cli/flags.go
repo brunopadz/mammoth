@@ -38,18 +38,6 @@ type flagInfoBool struct {
 }
 
 var (
-	FlagAdminHost = flagInfoString{
-		Name:        "host",
-		Description: "proxy admin server address",
-		Default:     "localhost",
-	}
-
-	FlagAdminPort = flagInfoString{
-		Name:        "port",
-		Description: "proxy admin server port",
-		Default:     "8000",
-	}
-
 	FlagOutputFormat = flagInfoString{
 		Name:        "format",
 		Description: "the output format",

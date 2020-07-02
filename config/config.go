@@ -34,10 +34,6 @@ func GetConfig() Config {
 	return c
 }
 
-func GetNodes() map[string]common.Node {
-	return c.Nodes
-}
-
 func GetProxyConfig() ProxyConfig {
 	return c.Server.Proxy
 }
@@ -98,17 +94,8 @@ type ProxyConfig struct {
 	HostPort string `mapstructure:"hostport"`
 }
 
-type AdminConfig struct {
-	HostPort string `mapstructure:"hostport"`
-}
-
 type ServerConfig struct {
-	Admin AdminConfig `mapstructure:"admin"`
 	Proxy ProxyConfig `mapstructure:"proxy"`
-}
-
-type PoolConfig struct {
-	Capacity int `mapstructure:"capacity"`
 }
 
 type Adapter struct {
@@ -117,10 +104,8 @@ type Adapter struct {
 }
 
 type Config struct {
-	//Nodes       map[string]common.Node `mapstructure:"nodes"`
-	Server      ServerConfig             `mapstructure:"server"`
-	Pool        PoolConfig               `mapstructure:"pool"`
-	Nodes       map[string]common.Node   `mapstructure:"nodes"`
+	Server ServerConfig `mapstructure:"server"`
+	//Nodes       map[string]common.Node   `mapstructure:"nodes"`
 	Credentials common.Credentials       `mapstructure:"credentials"`
 	HealthCheck common.HealthCheckConfig `mapstructure:"healthcheck"`
 }
