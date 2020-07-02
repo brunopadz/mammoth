@@ -22,7 +22,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	pb "github.com/crunchydata/crunchy-proxy/server/serverpb"
+	pb "github.com/twooster/pg-jump/server/serverpb"
 )
 
 var healthCmd = &cobra.Command{

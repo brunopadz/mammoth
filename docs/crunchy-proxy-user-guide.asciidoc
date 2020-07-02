@@ -368,7 +368,7 @@ environment variables accordingly.
 === Getting the source
 
 ....
-$> go get -d -u github.com/crunchydata/crunchy-proxy
+$> go get -d -u github.com/twooster/pg-jump
 ....
 
 === Building the binaries
@@ -379,7 +379,7 @@ necessary to install it by following the installation instructions
 https://github.com/Masterminds/glide#install[here].
 
 ....
-$> cd $GOPATH/src/github.com/crunchydata/crunchy-proxy
+$> cd $GOPATH/src/github.com/twooster/pg-jump
 $> make
 ....
 

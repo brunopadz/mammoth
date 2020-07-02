@@ -15,7 +15,7 @@ limitations under the License.
 package main
 
 import (
-	"github.com/crunchydata/crunchy-proxy/cli"
+	"github.com/twooster/pg-jump/cli"
 )
 
 func main() {

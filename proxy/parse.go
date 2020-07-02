@@ -18,7 +18,7 @@ package proxy
 import (
 	"strings"
 
-	"github.com/crunchydata/crunchy-proxy/protocol"
+	"github.com/twooster/pg-jump/protocol"
 )
 
 // GetAnnotations the annotation approach

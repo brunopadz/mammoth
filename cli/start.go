@@ -21,9 +21,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/crunchydata/crunchy-proxy/config"
-	"github.com/crunchydata/crunchy-proxy/server"
-	"github.com/crunchydata/crunchy-proxy/util/log"
+	"github.com/twooster/pg-jump/config"
+	"github.com/twooster/pg-jump/server"
+	"github.com/twooster/pg-jump/util/log"
 )
 
 var background bool

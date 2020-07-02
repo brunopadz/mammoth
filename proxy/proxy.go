@@ -19,12 +19,12 @@ import (
 	"net"
 	"sync"
 
-	"github.com/crunchydata/crunchy-proxy/common"
-	"github.com/crunchydata/crunchy-proxy/config"
-	"github.com/crunchydata/crunchy-proxy/connect"
-	"github.com/crunchydata/crunchy-proxy/pool"
-	"github.com/crunchydata/crunchy-proxy/protocol"
-	"github.com/crunchydata/crunchy-proxy/util/log"
+	"github.com/twooster/pg-jump/common"
+	"github.com/twooster/pg-jump/config"
+	"github.com/twooster/pg-jump/connect"
+	"github.com/twooster/pg-jump/pool"
+	"github.com/twooster/pg-jump/protocol"
+	"github.com/twooster/pg-jump/util/log"
 )
 
 type Proxy struct {

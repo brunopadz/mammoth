@@ -1,4 +1,4 @@
-package: github.com/crunchydata/crunchy-proxy
+package: github.com/twooster/pg-jump
 import:
 - package: github.com/golang/protobuf
   subpackages:
