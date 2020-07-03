@@ -26,14 +26,5 @@ type SSLConfig struct {
 }
 
 type Credentials struct {
-	Username string            `mapstructure:"username"`
-	Password string            `mapstructure:"password,omitempty"`
-	Database string            `mapstructure:"database"`
-	SSL      SSLConfig         `mapstructure:"ssl"`
-	Options  map[string]string `mapstructure:"options"`
-}
-
-type HealthCheckConfig struct {
-	Delay int    `mapstructure:"delay"`
-	Query string `mapstructure:"query"`
+	SSL SSLConfig `mapstructure:"ssl"`
 }

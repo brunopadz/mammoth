@@ -34,24 +34,12 @@ func GetConfig() Config {
 	return c
 }
 
-func GetProxyConfig() ProxyConfig {
-	return c.Server.Proxy
-}
-
-func GetAdminConfig() AdminConfig {
-	return c.Server.Admin
-}
-
-func GetPoolCapacity() int {
-	return c.Pool.Capacity
+func GetHostPort() string {
+	return c.HostPort
 }
 
 func GetCredentials() common.Credentials {
 	return c.Credentials
-}
-
-func GetHealthCheckConfig() common.HealthCheckConfig {
-	return c.HealthCheck
 }
 
 func Get(key string) interface{} {
@@ -90,24 +78,10 @@ func Set(key string, value interface{}) {
 	viper.Set(key, value)
 }
 
-type ProxyConfig struct {
-	HostPort string `mapstructure:"hostport"`
-}
-
-type ServerConfig struct {
-	Proxy ProxyConfig `mapstructure:"proxy"`
-}
-
-type Adapter struct {
-	AdapterType string                 `mapstructure:"adaptertype"`
-	Metadata    map[string]interface{} `mapstructure:"metadata"`
-}
-
 type Config struct {
-	Server ServerConfig `mapstructure:"server"`
+	HostPort string `mapstructure:"hostport"`
 	//Nodes       map[string]common.Node   `mapstructure:"nodes"`
-	Credentials common.Credentials       `mapstructure:"credentials"`
-	HealthCheck common.HealthCheckConfig `mapstructure:"healthcheck"`
+	Credentials common.Credentials `mapstructure:"credentials"`
 }
 
 func SetConfigPath(path string) {

@@ -51,12 +51,11 @@ func Connect(host string) (net.Conn, error) {
 		 */
 
 		/* Create the SSL request message. */
-		message := protocol.NewMessageBuffer([]byte{})
-		message.WriteInt32(8)
+		message := protocol.NewPostgresBuffer(0x00)
 		message.WriteInt32(protocol.SSLRequestCode)
 
 		/* Send the SSL request message. */
-		_, err := connection.Write(message.Bytes())
+		err := message.WriteTo(connection)
 
 		if err != nil {
 			log.Error("Error sending SSL request to backend.")
@@ -65,12 +64,12 @@ func Connect(host string) (net.Conn, error) {
 		}
 
 		/* Receive SSL response message. */
-		response := make([]byte, 4096)
-		_, err = connection.Read(response)
+		sslResponseBuf := make([]byte, 1)
+		_, err = connection.Read(sslResponseBuf)
 
 		if err != nil {
 			log.Error("Error receiving SSL response from backend.")
-			log.Errorf("Error: %s", err.Error())
+			log.Errorf("Error: %v", err)
 			return nil, err
 		}
 
@@ -78,7 +77,7 @@ func Connect(host string) (net.Conn, error) {
 		 * If SSL is not allowed by the backend then close the connection and
 		 * throw an error.
 		 */
-		if len(response) > 0 && response[0] != 'S' {
+		if sslResponseBuf[0] != protocol.SSLAllowed {
 			log.Error("The backend does not allow SSL connections.")
 			connection.Close()
 		} else {

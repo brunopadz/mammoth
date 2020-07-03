@@ -41,28 +41,27 @@ const (
 )
 
 /*
- *
+ * Upgrades an incoming connection to the proxy server to use SSL
  */
 func UpgradeServerConnection(client net.Conn) net.Conn {
 	creds := config.GetCredentials()
 
-	if creds.SSL.Enable {
-		tlsConfig := tls.Config{}
+	tlsConfig := tls.Config{}
 
-		cert, _ := tls.LoadX509KeyPair(
-			creds.SSL.SSLServerCert,
-			creds.SSL.SSLServerKey)
+	cert, _ := tls.LoadX509KeyPair(
+		creds.SSL.SSLServerCert,
+		creds.SSL.SSLServerKey)
 
-		tlsConfig.Certificates = []tls.Certificate{cert}
+	tlsConfig.Certificates = []tls.Certificate{cert}
 
-		client = tls.Server(client, &tlsConfig)
-	}
+	client = tls.Server(client, &tlsConfig)
 
 	return client
 }
 
 /*
- *
+ * Upgrades a connection from the proxy server to the remote Postgres
+ * instance to use SSL
  */
 func UpgradeClientConnection(hostPort string, connection net.Conn) net.Conn {
 	verifyCA := false

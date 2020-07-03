@@ -38,10 +38,8 @@ func NewServer() *Server {
 }
 
 func (s *Server) Start() {
-	proxyConfig := config.GetProxyConfig()
-
 	log.Info("Proxy Server Starting...")
-	proxyListener, err := net.Listen("tcp", proxyConfig.HostPort)
+	proxyListener, err := net.Listen("tcp", config.GetHostPort())
 	if err != nil {
 		log.Fatal(err.Error())
 		return

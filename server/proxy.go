@@ -41,7 +41,7 @@ func (s *ProxyServer) Serve(l net.Listener) error {
 	defer s.server.waitGroup.Done()
 	s.listener = l
 
-	s.p = proxy.NewProxy()
+	s.p = &proxy.Proxy{}
 
 	for {
 
@@ -57,12 +57,14 @@ func (s *ProxyServer) Serve(l net.Listener) error {
 			continue
 		}
 
-		go s.p.HandleConnection(conn)
+		go func() {
+			err := s.p.HandleConnection(conn)
+			if err != nil {
+				log.Infof("Connection error: %v\n", err)
+			}
+			conn.Close()
+		}()
 	}
-}
-
-func (s *ProxyServer) Stats() map[string]int32 {
-	return s.p.Stats
 }
 
 func (s *ProxyServer) Stop() {
