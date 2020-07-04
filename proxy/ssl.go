@@ -13,7 +13,7 @@
  limitations under the License.
 */
 
-package connect
+package proxy
 
 import (
 	"crypto/tls"

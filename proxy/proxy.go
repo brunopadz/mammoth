@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/twooster/pg-jump/config"
-	"github.com/twooster/pg-jump/connect"
 	"github.com/twooster/pg-jump/protocol"
 	"github.com/twooster/pg-jump/util/log"
 )
@@ -110,7 +109,7 @@ func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 			log.Info("Upgrading SSL connection")
 			clientConn.Write([]byte{protocol.SSLAllowed})
 			/* Upgrade the client connection if required. */
-			clientConn = connect.UpgradeServerConnection(clientConn)
+			clientConn = UpgradeServerConnection(clientConn)
 		} else {
 			log.Info("Rejecting SSL handshake")
 			_, err := clientConn.Write([]byte{protocol.SSLNotAllowed})
@@ -158,7 +157,7 @@ func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 		return nil
 	}
 
-	serverConn, err := connect.Connect(hostPort)
+	serverConn, err := Connect(hostPort)
 	if err != nil {
 		fmt.Printf("Unable to connect to backend %v: %v", hostPort, err)
 		// log
