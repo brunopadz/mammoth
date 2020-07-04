@@ -122,7 +122,11 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 				return err
 			}
 			/* Upgrade the client connection if required. */
-			clientConn = UpgradeServerConnection(clientConn, p.SSLConfig)
+			clientConn, err = UpgradeServerConnection(clientConn, p.SSLConfig)
+			if err != nil {
+				p.log.Errorf("Error upgrading SSL connection: %w", err)
+				return err
+			}
 		} else {
 			log.Debugf("SSL disabled, rejecting SSL handshake")
 			_, err := clientConn.Write([]byte{protocol.SSLNotAllowed})

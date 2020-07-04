@@ -18,6 +18,7 @@ package proxy
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io/ioutil"
 	"net"
 
@@ -27,12 +28,6 @@ import (
 
 /* SSL constants. */
 const (
-	SSL_REQUEST_CODE int32 = 80877103
-
-	/* SSL Responses */
-	SSL_ALLOWED     byte = 'S'
-	SSL_NOT_ALLOWED byte = 'N'
-
 	/* SSL Modes */
 	SSL_MODE_REQUIRE     string = "require"
 	SSL_MODE_VERIFY_CA   string = "verify-ca"
@@ -43,27 +38,35 @@ const (
 /*
  * Upgrades an incoming connection to the proxy server to use SSL
  */
-func UpgradeServerConnection(client net.Conn, ssl *config.SSLConfig) net.Conn {
+func UpgradeServerConnection(conn net.Conn, ssl *config.SSLConfig) (net.Conn, error) {
 	tlsConfig := tls.Config{}
 
-	cert, _ := tls.LoadX509KeyPair(
+	cert, err := tls.LoadX509KeyPair(
 		ssl.SSLServerCert,
 		ssl.SSLServerKey)
 
+	if err != nil {
+		return conn, err
+	}
+
 	tlsConfig.Certificates = []tls.Certificate{cert}
 
-	client = tls.Server(client, &tlsConfig)
+	conn = tls.Server(conn, &tlsConfig)
 
-	return client
+	return conn, nil
 }
 
 /*
  * Upgrades a connection from the proxy server to the remote Postgres
  * instance to use SSL
  */
-func UpgradeClientConnection(hostPort string, conn net.Conn, ssl *config.SSLConfig) net.Conn {
+func UpgradeClientConnection(hostPort string, conn net.Conn, ssl *config.SSLConfig) (net.Conn, error) {
+	hostname, _, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return conn, err
+	}
+
 	verifyCA := false
-	hostname, _, _ := net.SplitHostPort(hostPort)
 	tlsConfig := tls.Config{}
 
 	/*
@@ -73,7 +76,6 @@ func UpgradeClientConnection(hostPort string, conn net.Conn, ssl *config.SSLConf
 	 * error.
 	 */
 	switch ssl.SSLMode {
-
 	case SSL_MODE_REQUIRE:
 		tlsConfig.InsecureSkipVerify = true
 
@@ -91,20 +93,26 @@ func UpgradeClientConnection(hostPort string, conn net.Conn, ssl *config.SSLConf
 	case SSL_MODE_VERIFY_FULL:
 		tlsConfig.ServerName = hostname
 	case SSL_MODE_DISABLE:
-		return conn
+		return conn, nil
 	default:
-		log.Fatalf("Unsupported sslmode %s\n", ssl.SSLMode)
+		return conn, fmt.Errorf("Unsupported sslmode %s\n", ssl.SSLMode)
 	}
 
 	/* Add client SSL certificate and key. */
 	log.Debug("Loading SSL certificate and key")
-	cert, _ := tls.LoadX509KeyPair(ssl.SSLCert, ssl.SSLKey)
+	cert, err := tls.LoadX509KeyPair(ssl.SSLCert, ssl.SSLKey)
+	if err != nil {
+		return conn, err
+	}
 	tlsConfig.Certificates = []tls.Certificate{cert}
 
 	/* Add root CA certificate. */
 	log.Debug("Loading root CA.")
 	tlsConfig.RootCAs = x509.NewCertPool()
-	rootCA, _ := ioutil.ReadFile(ssl.SSLRootCA)
+	rootCA, err := ioutil.ReadFile(ssl.SSLRootCA)
+	if err != nil {
+		return conn, err
+	}
 	tlsConfig.RootCAs.AppendCertsFromPEM(rootCA)
 
 	/* Upgrade the connection. */
@@ -113,15 +121,11 @@ func UpgradeClientConnection(hostPort string, conn net.Conn, ssl *config.SSLConf
 
 	if verifyCA {
 		log.Debug("Verify CA is enabled")
-		err := verifyCertificateAuthority(client, &tlsConfig)
-		if err != nil {
-			log.Fatalf("Could not verify certificate authority: %s", err.Error())
-		} else {
-			log.Info("Successfully verified CA")
-		}
+		err = verifyCertificateAuthority(client, &tlsConfig)
+		return client, err
+	} else {
+		return client, nil
 	}
-
-	return client
 }
 
 /*

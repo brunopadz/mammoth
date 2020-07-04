@@ -23,7 +23,7 @@ import (
 )
 
 func Connect(host string, ssl *config.SSLConfig) (net.Conn, error) {
-	connection, err := net.Dial("tcp", host)
+	conn, err := net.Dial("tcp", host)
 
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func Connect(host string, ssl *config.SSLConfig) (net.Conn, error) {
 		/* Create the SSL request message. */
 		message := protocol.NewBuffer()
 		message.WriteInt32(protocol.SSLRequestCode)
-		err := message.WriteTo(connection)
+		err := message.WriteTo(conn)
 
 		if err != nil {
 			log.Error("Error sending SSL request to backend.")
@@ -53,7 +53,7 @@ func Connect(host string, ssl *config.SSLConfig) (net.Conn, error) {
 
 		/* Receive SSL response message. */
 		sslResponseBuf := []byte{0}
-		_, err = connection.Read(sslResponseBuf)
+		_, err = conn.Read(sslResponseBuf)
 
 		if err != nil {
 			log.Error("Error receiving SSL response from backend.")
@@ -67,14 +67,18 @@ func Connect(host string, ssl *config.SSLConfig) (net.Conn, error) {
 		 */
 		if sslResponseBuf[0] != protocol.SSLAllowed {
 			log.Error("The backend does not allow SSL connections.")
-			connection.Close()
+			conn.Close()
 		} else {
 			log.Debug("SSL connections are allowed by PostgreSQL.")
 			log.Debug("Attempting to upgrade connection.")
-			connection = UpgradeClientConnection(host, connection, ssl)
+			conn, err = UpgradeClientConnection(host, conn, ssl)
+			if err != nil {
+				log.Debug("Connection failed to upgrade.")
+				return conn, err
+			}
 			log.Debug("Connection successfully upgraded.")
 		}
 	}
 
-	return connection, nil
+	return conn, nil
 }
