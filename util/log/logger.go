@@ -67,6 +67,10 @@ func Fatalf(format string, args ...interface{}) {
 	logrus.Fatalf(format, args...)
 }
 
+func WithFields(f logrus.Fields) *logrus.Entry {
+	return logrus.WithFields(f)
+}
+
 func SetLevel(level string) {
 	logrusLevel, err := logrus.ParseLevel(level)
 

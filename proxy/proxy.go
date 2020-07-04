@@ -16,11 +16,11 @@ package proxy
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/twooster/pg-jump/config"
 	"github.com/twooster/pg-jump/protocol"
 	"github.com/twooster/pg-jump/util/log"
@@ -83,38 +83,52 @@ func parseStartupMessage(r *protocol.Reader) (hostPort string, newStartupMessage
 	return
 }
 
-// HandleConnection handle an incoming connection to the proxy
-func (p *Proxy) HandleConnection(clientConn net.Conn) error {
-	log.Infof("Accepting connection from %v", clientConn.RemoteAddr())
+type ProxyConnection struct {
+	log       logrus.FieldLogger
+	SSLConfig *config.SSLConfig
+}
+
+func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
+	defer clientConn.Close()
+
+	p.log.Infof("Accepting connection")
 
 	r, err := protocol.ReadMessage(clientConn)
 	if err != nil {
-		return fmt.Errorf("Error reading initial StartupMessage: %w", err)
+		p.log.Errorf("Error reading initial StartupMessage: %w", err)
+		return err
 	}
 
 	version, err := r.ReadInt32()
 	if err != nil {
-		return fmt.Errorf("Error reading initial StartupMessage: %w", err)
+		p.log.Errorf("Error reading initial StartupMessage: %w", err)
+		return err
 	}
 
 	if version == protocol.SSLRequestCode {
-		log.Infof("User requesting SSL upgrade")
+		p.log.Debugf("Client requesting SSL upgrade")
 
 		if err := r.Finalize(); err != nil {
-			return fmt.Errorf("Error while upgrading to SSL connection: %w", err)
+			p.log.Errorf("Error upgrading to SSL connection: %w", err)
+			return err
 		}
 
 		/* Determine which SSL response to send to client. */
 		if p.SSLConfig.Enable {
-			log.Info("Upgrading SSL connection")
-			clientConn.Write([]byte{protocol.SSLAllowed})
+			p.log.Debugf("Upgrading SSL connection")
+			_, err := clientConn.Write([]byte{protocol.SSLAllowed})
+			if err != nil {
+				p.log.Errorf("Error upgrading SSL connection: %w", err)
+				return err
+			}
 			/* Upgrade the client connection if required. */
 			clientConn = UpgradeServerConnection(clientConn, p.SSLConfig)
 		} else {
-			log.Info("Rejecting SSL handshake")
+			log.Debugf("SSL disabled, rejecting SSL handshake")
 			_, err := clientConn.Write([]byte{protocol.SSLNotAllowed})
 			if err != nil {
-				return fmt.Errorf("Error during SSL upgrade: %v", err)
+				p.log.Errorf("Error rejecting SSL upgrade: %v", err)
+				return err
 			}
 		}
 
@@ -126,51 +140,47 @@ func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 		 */
 		r, err = protocol.ReadMessage(clientConn)
 		if err == io.EOF {
-			log.Info("Client rejected SSL upgrade")
+			p.log.Info("Client rejected SSL upgrade")
 			return nil
 		} else if err != nil {
-			return fmt.Errorf("Error reading StartupMessage after SSL upgrade: %w", err)
+			p.log.Errorf("Error reading StartupMessage after SSL upgrade: %w", err)
+			return err
 		} else {
-			log.Info("Client accepted handshake")
+			log.Debugf("Client accepted SSL upgrade")
 		}
 
 		version, err = r.ReadInt32()
 		if err != nil {
-			return fmt.Errorf("Error reading StartupMessage after SSL upgrade: %w", err)
+			p.log.Errorf("Error reading StartupMessage after SSL upgrade: %w", err)
+			return err
 		}
 	}
 
 	if version != protocol.ProtocolVersion {
-		fmt.Printf("Invalid protocol version from client: %v", version)
-		// log
+		p.log.Errorf("Invalid protocol version from client: %v", version)
 		// send error to client
-		// disconnect client
-		return nil
+		return err
 	}
 
 	hostPort, newStartupMessage, err := parseStartupMessage(r)
 	if err != nil {
-		fmt.Printf("Unable to parse startup message from client: %v", err)
-		// log
+		p.log.Errorf("Unable to parse startup message from client: %v", err)
 		// send error to client
-		// disconnect client
-		return nil
+		return err
 	}
 
 	serverConn, err := Connect(hostPort, p.SSLConfig)
 	if err != nil {
-		fmt.Printf("Unable to connect to backend %v: %v", hostPort, err)
-		// log
+		p.log.Errorf("Unable to connect to backend %v: %v", hostPort, err)
 		// send error to client
-		// disconnect client
+		return err
 	}
+	defer serverConn.Close()
 
 	err = newStartupMessage.WriteTo(serverConn)
 	if err != nil {
-		fmt.Printf("Error writing StartupMessage to remote server: %v", err)
-		// log
+		p.log.Errorf("Error writing StartupMessage to remote server: %v", err)
 		// send error to client
-		// disconnect client
 		return nil
 	}
 
@@ -191,10 +201,25 @@ func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 
 	clientErr := <-clientDone
 	serverErr := <-serverDone
-	serverConn.Close()
-	clientConn.Close()
 
-	log.Infof("Server: %v, Client: %v", serverErr, clientErr)
+	if clientErr != nil {
+		p.log.Errorf("Client closed with error:", clientErr)
+	}
+	if serverErr != nil {
+		p.log.Errorf("Server closed with error:", serverErr)
+	}
+
+	p.log.Infof("Client disconneted")
 
 	return nil
+}
+
+// HandleConnection handle an incoming connection to the proxy
+func (p *Proxy) HandleConnection(conn net.Conn) error {
+	return (&ProxyConnection{
+		SSLConfig: p.SSLConfig,
+		log: log.WithFields(logrus.Fields{
+			"remoteAddr": conn.RemoteAddr(),
+		}),
+	}).HandleConnection(conn)
 }

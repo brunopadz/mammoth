@@ -52,7 +52,6 @@ func (s *ProxyServer) Serve(l net.Listener) {
 		}
 
 		conn, err := l.Accept()
-
 		if err != nil {
 			continue
 		}
