@@ -158,7 +158,9 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			p.log.Info("Rejecting client without SSL because allowUnecrypted is false")
 			return errors.New("Rejecting client not using SSL")
 		}
-	} else if version == protocol.CancelRequestCode {
+	}
+
+	if version == protocol.CancelRequestCode {
 		p.log.Infof("Client attempted to cancel a query; this is not supported")
 		// Cancelling can't be handled
 		protocol.WriteError(clientConn, protocol.Error{
@@ -167,9 +169,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			Message:  "Cancellation not supported by pg-jump",
 		})
 		return err
-	}
-
-	if version != protocol.ProtocolVersion {
+	} else if version != protocol.ProtocolVersion {
 		p.log.Errorf("Invalid protocol version from client: %v", version)
 		return err
 	}
@@ -229,9 +229,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	clientDone := make(chan bool)
 	go func() {
 		err := p.CopyAndLogCommands(serverConn, clientConn)
-		if err == io.EOF {
-			err = nil
-		} else if err != nil {
+		if err != nil && err == io.EOF {
 			p.log.Errorf("Client closed with error: %v", err)
 		}
 		close(clientDone)
