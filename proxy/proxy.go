@@ -27,6 +27,7 @@ import (
 )
 
 type Proxy struct {
+	SSLConfig *config.SSLConfig
 }
 
 func parseStartupMessage(r *protocol.Reader) (hostPort string, newStartupMessage *protocol.Buffer, e error) {
@@ -104,12 +105,11 @@ func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 		}
 
 		/* Determine which SSL response to send to client. */
-		creds := config.GetCredentials()
-		if creds.SSL.Enable {
+		if p.SSLConfig.Enable {
 			log.Info("Upgrading SSL connection")
 			clientConn.Write([]byte{protocol.SSLAllowed})
 			/* Upgrade the client connection if required. */
-			clientConn = UpgradeServerConnection(clientConn)
+			clientConn = UpgradeServerConnection(clientConn, p.SSLConfig)
 		} else {
 			log.Info("Rejecting SSL handshake")
 			_, err := clientConn.Write([]byte{protocol.SSLNotAllowed})
@@ -157,7 +157,7 @@ func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 		return nil
 	}
 
-	serverConn, err := Connect(hostPort)
+	serverConn, err := Connect(hostPort, p.SSLConfig)
 	if err != nil {
 		fmt.Printf("Unable to connect to backend %v: %v", hostPort, err)
 		// log

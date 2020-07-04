@@ -43,14 +43,12 @@ const (
 /*
  * Upgrades an incoming connection to the proxy server to use SSL
  */
-func UpgradeServerConnection(client net.Conn) net.Conn {
-	creds := config.GetCredentials()
-
+func UpgradeServerConnection(client net.Conn, ssl *config.SSLConfig) net.Conn {
 	tlsConfig := tls.Config{}
 
 	cert, _ := tls.LoadX509KeyPair(
-		creds.SSL.SSLServerCert,
-		creds.SSL.SSLServerKey)
+		ssl.SSLServerCert,
+		ssl.SSLServerKey)
 
 	tlsConfig.Certificates = []tls.Certificate{cert}
 
@@ -63,11 +61,10 @@ func UpgradeServerConnection(client net.Conn) net.Conn {
  * Upgrades a connection from the proxy server to the remote Postgres
  * instance to use SSL
  */
-func UpgradeClientConnection(hostPort string, connection net.Conn) net.Conn {
+func UpgradeClientConnection(hostPort string, conn net.Conn, ssl *config.SSLConfig) net.Conn {
 	verifyCA := false
 	hostname, _, _ := net.SplitHostPort(hostPort)
 	tlsConfig := tls.Config{}
-	creds := config.GetCredentials()
 
 	/*
 	 * Configure the connection based on the mode specificed in the proxy
@@ -75,7 +72,7 @@ func UpgradeClientConnection(hostPort string, connection net.Conn) net.Conn {
 	 * 'verify-full' and 'disable'. Any other value will result in a fatal
 	 * error.
 	 */
-	switch creds.SSL.SSLMode {
+	switch ssl.SSLMode {
 
 	case SSL_MODE_REQUIRE:
 		tlsConfig.InsecureSkipVerify = true
@@ -87,32 +84,32 @@ func UpgradeClientConnection(hostPort string, connection net.Conn) net.Conn {
 		 * root CA file exists, then the behavior of 'sslmode=require' needs to
 		 * be the same as 'sslmode=verify-ca'.
 		 */
-		verifyCA = (creds.SSL.SSLRootCA != "")
+		verifyCA = (ssl.SSLRootCA != "")
 	case SSL_MODE_VERIFY_CA:
 		tlsConfig.InsecureSkipVerify = true
 		verifyCA = true
 	case SSL_MODE_VERIFY_FULL:
 		tlsConfig.ServerName = hostname
 	case SSL_MODE_DISABLE:
-		return connection
+		return conn
 	default:
-		log.Fatalf("Unsupported sslmode %s\n", creds.SSL.SSLMode)
+		log.Fatalf("Unsupported sslmode %s\n", ssl.SSLMode)
 	}
 
 	/* Add client SSL certificate and key. */
 	log.Debug("Loading SSL certificate and key")
-	cert, _ := tls.LoadX509KeyPair(creds.SSL.SSLCert, creds.SSL.SSLKey)
+	cert, _ := tls.LoadX509KeyPair(ssl.SSLCert, ssl.SSLKey)
 	tlsConfig.Certificates = []tls.Certificate{cert}
 
 	/* Add root CA certificate. */
 	log.Debug("Loading root CA.")
 	tlsConfig.RootCAs = x509.NewCertPool()
-	rootCA, _ := ioutil.ReadFile(creds.SSL.SSLRootCA)
+	rootCA, _ := ioutil.ReadFile(ssl.SSLRootCA)
 	tlsConfig.RootCAs.AppendCertsFromPEM(rootCA)
 
 	/* Upgrade the connection. */
 	log.Info("Upgrading to SSL connection.")
-	client := tls.Client(connection, &tlsConfig)
+	client := tls.Client(conn, &tlsConfig)
 
 	if verifyCA {
 		log.Debug("Verify CA is enabled")

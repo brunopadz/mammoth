@@ -14,10 +14,6 @@ limitations under the License.
 
 package protocol
 
-import (
-	"io"
-)
-
 /* PostgreSQL Protocol Version/Code constants */
 const (
 	ProtocolVersion int32 = 196608
@@ -55,9 +51,3 @@ const (
 	AuthenticationGSSContinue int32 = 8
 	AuthenticationSSPI        int32 = 9
 )
-
-func ReadMessageType(r io.Reader) (byte, error) {
-	buf := []byte{0}
-	_, err := r.Read(buf)
-	return buf[0], err
-}

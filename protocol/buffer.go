@@ -9,8 +9,8 @@ import (
 )
 
 type Buffer struct {
-	b           *bytes.Buffer
-	multiReader io.Reader
+	b *bytes.Buffer
+	r io.Reader
 }
 
 func NewBuffer() *Buffer {
@@ -59,7 +59,7 @@ func (p *Buffer) WriteTo(w io.Writer) error {
 }
 
 func (p *Buffer) Read(b []byte) (int, error) {
-	if p.multiReader == nil {
+	if p.r == nil {
 		len := p.b.Len() + 4
 		if len > math.MaxInt32 {
 			return 0, errors.New("Length of message too large")
@@ -71,7 +71,7 @@ func (p *Buffer) Read(b []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		p.multiReader = io.MultiReader(header, p.b)
+		p.r = io.MultiReader(header, p.b)
 	}
-	return p.multiReader.Read(b)
+	return p.r.Read(b)
 }

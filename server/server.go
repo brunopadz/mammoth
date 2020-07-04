@@ -16,39 +16,38 @@ package server
 
 import (
 	"net"
-	"sync"
 
 	"github.com/twooster/pg-jump/config"
 	"github.com/twooster/pg-jump/util/log"
 )
 
 type Server struct {
-	proxy     *ProxyServer
-	waitGroup *sync.WaitGroup
+	c     *config.Config
+	proxy *ProxyServer
 }
 
-func NewServer() *Server {
+func NewServer(c *config.Config) *Server {
 	s := &Server{
-		waitGroup: &sync.WaitGroup{},
+		c:     c,
+		proxy: NewProxyServer(c),
 	}
-
-	s.proxy = NewProxyServer(s)
-
 	return s
 }
 
 func (s *Server) Start() {
-	log.Info("Proxy Server Starting...")
-	proxyListener, err := net.Listen("tcp", config.GetHostPort())
+	log.Info("Server starting...")
+
+	proxyListener, err := net.Listen("tcp", s.c.HostPort)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatalf("Could not create listener on %v: %v\n", s.c.HostPort, err)
 		return
 	}
 
-	s.waitGroup.Add(1)
-	go s.proxy.Serve(proxyListener)
+	s.proxy.Serve(proxyListener)
 
-	s.waitGroup.Wait()
+	log.Info("Server exiting...")
+}
 
-	log.Info("Server Exiting...")
+func (s *Server) Stop() {
+	s.proxy.Stop()
 }

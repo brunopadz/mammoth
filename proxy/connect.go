@@ -22,14 +22,14 @@ import (
 	"github.com/twooster/pg-jump/util/log"
 )
 
-func Connect(host string) (net.Conn, error) {
+func Connect(host string, ssl *config.SSLConfig) (net.Conn, error) {
 	connection, err := net.Dial("tcp", host)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if config.GetBool("credentials.ssl.enable") {
+	if ssl.Enable {
 		log.Info("SSL connections are enabled.")
 
 		/*
@@ -71,7 +71,7 @@ func Connect(host string) (net.Conn, error) {
 		} else {
 			log.Debug("SSL connections are allowed by PostgreSQL.")
 			log.Debug("Attempting to upgrade connection.")
-			connection = UpgradeClientConnection(host, connection)
+			connection = UpgradeClientConnection(host, connection, ssl)
 			log.Debug("Connection successfully upgraded.")
 		}
 	}

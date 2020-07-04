@@ -15,10 +15,6 @@ limitations under the License.
 package cli
 
 import (
-	"os"
-	"os/exec"
-	"strings"
-
 	"github.com/spf13/cobra"
 
 	"github.com/twooster/pg-jump/config"
@@ -26,7 +22,6 @@ import (
 	"github.com/twooster/pg-jump/util/log"
 )
 
-var background bool
 var configPath string
 var logLevel string
 
@@ -40,38 +35,23 @@ var startCmd = &cobra.Command{
 
 func init() {
 	flags := startCmd.Flags()
-	boolFlag(flags, &background, FlagBackground)
 	stringFlag(flags, &configPath, FlagConfigPath)
 	stringFlag(flags, &logLevel, FlagLogLevel)
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
-	if background {
-		args = make([]string, 0, len(os.Args))
-
-		for _, arg := range os.Args {
-			if strings.HasPrefix(arg, "--background") {
-				continue
-			}
-			args = append(args, arg)
-		}
-
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		return cmd.Start()
-	}
-
 	log.SetLevel(logLevel)
 
 	if configPath != "" {
 		config.SetConfigPath(configPath)
 	}
 
-	config.ReadConfig()
+	c, err := config.ReadConfig()
+	if err != nil {
+		return err
+	}
 
-	s := server.NewServer()
+	s := server.NewServer(c)
 
 	s.Start()
 

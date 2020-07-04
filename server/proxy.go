@@ -17,37 +17,37 @@ package server
 import (
 	"net"
 
+	"github.com/twooster/pg-jump/config"
 	"github.com/twooster/pg-jump/proxy"
 	"github.com/twooster/pg-jump/util/log"
 )
 
 type ProxyServer struct {
 	ch       chan bool
-	server   *Server
 	p        *proxy.Proxy
 	listener net.Listener
 }
 
-func NewProxyServer(s *Server) *ProxyServer {
-	proxy := &ProxyServer{}
-	proxy.ch = make(chan bool)
-	proxy.server = s
+func NewProxyServer(c *config.Config) *ProxyServer {
+	p := &ProxyServer{
+		ch: make(chan bool),
+		p: &proxy.Proxy{
+			SSLConfig: &c.SSLConfig,
+		},
+	}
 
-	return proxy
+	return p
 }
 
-func (s *ProxyServer) Serve(l net.Listener) error {
+func (s *ProxyServer) Serve(l net.Listener) {
 	log.Infof("Proxy Server listening on: %s", l.Addr())
-	defer s.server.waitGroup.Done()
+
 	s.listener = l
 
-	s.p = &proxy.Proxy{}
-
 	for {
-
 		select {
 		case <-s.ch:
-			return nil
+			return
 		default:
 		}
 
@@ -62,7 +62,6 @@ func (s *ProxyServer) Serve(l net.Listener) error {
 			if err != nil {
 				log.Infof("Connection error: %v\n", err)
 			}
-			conn.Close()
 		}()
 	}
 }

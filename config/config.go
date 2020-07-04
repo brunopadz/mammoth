@@ -17,29 +17,29 @@ package config
 import (
 	"github.com/spf13/viper"
 
-	"github.com/twooster/pg-jump/common"
 	"github.com/twooster/pg-jump/util/log"
 )
-
-var c Config
 
 func init() {
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
-	viper.AddConfigPath("/etc/crunchy-proxy")
 	viper.AddConfigPath(".")
 }
 
-func GetConfig() Config {
-	return c
+type SSLConfig struct {
+	Enable        bool   `mapstructure:"enable"`
+	SSLMode       string `mapstructure:"sslmode"`
+	SSLCert       string `mapstructure:"sslcert,omitempty"`
+	SSLKey        string `mapstructure:"sslkey,omitempty"`
+	SSLRootCA     string `mapstructure:"sslrootca,omitempty"`
+	SSLServerCert string `mapstructure:"sslservercert,omitempty"`
+	SSLServerKey  string `mapstructure:"sslserverkey,omitempty"`
+	SSLServerCA   string `mapstructure:"sslserverca,omitempty"`
 }
 
-func GetHostPort() string {
-	return c.HostPort
-}
-
-func GetCredentials() common.Credentials {
-	return c.Credentials
+type Config struct {
+	HostPort  string    `mapstructure:"hostport"`
+	SSLConfig SSLConfig `mapstructure:"ssl"`
 }
 
 func Get(key string) interface{} {
@@ -78,28 +78,22 @@ func Set(key string, value interface{}) {
 	viper.Set(key, value)
 }
 
-type Config struct {
-	HostPort string `mapstructure:"hostport"`
-	//Nodes       map[string]common.Node   `mapstructure:"nodes"`
-	Credentials common.Credentials `mapstructure:"credentials"`
-}
-
 func SetConfigPath(path string) {
 	viper.SetConfigFile(path)
 }
 
-func ReadConfig() {
-	err := viper.ReadInConfig()
-	log.Debugf("Using configuration file: %s", viper.ConfigFileUsed())
+func ReadConfig() (*Config, error) {
+	log.Debugf("Reading configuration file: %s", viper.ConfigFileUsed())
 
-	if err != nil {
-		log.Fatal(err.Error())
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, err
 	}
 
-	err = viper.Unmarshal(&c)
+	c := &Config{}
 
-	if err != nil {
+	if err := viper.Unmarshal(c); err != nil {
 		log.Errorf("Error unmarshaling configuration file: %s", viper.ConfigFileUsed())
-		log.Fatalf(err.Error())
+		return nil, err
 	}
+	return c, nil
 }
