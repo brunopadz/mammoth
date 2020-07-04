@@ -43,9 +43,9 @@ type ClientConfig struct {
 }
 
 type Config struct {
-	HostPort string       `mapstructure:"hostport"`
-	Server   ServerConfig `mapstructure:"server"`
-	Client   ClientConfig `mapstructure:"client"`
+	Bind   string       `mapstructure:"bind"`
+	Server ServerConfig `mapstructure:"server"`
+	Client ClientConfig `mapstructure:"client"`
 }
 
 func SetConfigPath(path string) {

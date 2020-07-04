@@ -1,4 +1,4 @@
-hostPort: ":5000"
+bind: ":5000"
 server:
   allowUnencrypted: true
 client:

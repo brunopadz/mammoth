@@ -36,9 +36,9 @@ func NewServer(c *config.Config) *Server {
 
 func (s *Server) Start() error {
 	log.Info("Server starting...")
-	proxyListener, err := net.Listen("tcp", s.c.HostPort)
+	proxyListener, err := net.Listen("tcp", s.c.Bind)
 	if err != nil {
-		log.Fatalf("Could not create listener on %v: %v\n", s.c.HostPort, err)
+		log.Fatalf("Could not create listener on %v: %v\n", s.c.Bind, err)
 		return err
 	}
 

@@ -21,14 +21,14 @@ type ServerTLSConfig struct {
 }
 
 type Config struct {
-	HostPort  string
+	Bind      string
 	ClientTLS ClientTLSConfig
 	ServerTLS ServerTLSConfig
 }
 
 func FromFile(f *file.Config) (*Config, error) {
 	c := Config{
-		HostPort: f.HostPort,
+		Bind: f.Bind,
 		ClientTLS: ClientTLSConfig{
 			AllowUnencrypted: f.Client.AllowUnencrypted,
 			TrySSL:           f.Client.TrySSL,
