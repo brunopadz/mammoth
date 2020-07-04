@@ -4,3 +4,7 @@ be to limit the servers you could target, as well as to log all user-commands
 to the Postgres host for later auditing.
 
 Very much a WIP.
+
+TODO:
+* Support for the following message types:
+  * CancelRequest

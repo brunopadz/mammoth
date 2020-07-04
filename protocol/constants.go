@@ -29,15 +29,24 @@ const (
 	AuthenticationMessageType  byte = 'R'
 	ErrorMessageType           byte = 'E'
 	EmptyQueryMessageType      byte = 'I'
-	DescribeMessageType        byte = 'D'
 	RowDescriptionMessageType  byte = 'T'
 	DataRowMessageType         byte = 'D'
-	QueryMessageType           byte = 'Q'
 	CommandCompleteMessageType byte = 'C'
 	TerminateMessageType       byte = 'X'
 	NoticeMessageType          byte = 'N'
 	PasswordMessageType        byte = 'p'
 	ReadyForQueryMessageType   byte = 'Z'
+
+	BindMessageType         byte = 'B'
+	CloseMessageType        byte = 'C'
+	CopyDataMessageType     byte = 'd'
+	CopyDoneMessageType     byte = 'c'
+	CopyFailMessageType     byte = 'f'
+	DescribeMessageType     byte = 'D'
+	ExecuteMessageType      byte = 'E'
+	FunctionCallMessageType byte = 'F'
+	ParseMessageType        byte = 'P'
+	SimpleQueryMessageType  byte = 'Q'
 )
 
 /* PostgreSQL Authentication Method constants. */

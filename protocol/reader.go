@@ -23,9 +23,8 @@ func ReadMessage(r io.Reader) (*Reader, error) {
 	if sz < 4 {
 		return nil, errors.New("Message size < 4 or overflow")
 	}
-	sz -= 4
 
-	lr := io.LimitReader(r, int64(sz))
+	lr := io.LimitReader(r, int64(sz-4))
 	return &Reader{
 		Len: sz,
 		r:   bufio.NewReader(lr),
@@ -60,7 +59,7 @@ func (r *Reader) ReadByte() (b byte, err error) {
 }
 
 func (r *Reader) Finalize() error {
-	n, err := r.Discard()
+	n, err := r.r.WriteTo(ioutil.Discard)
 	if err != nil {
 		return err
 	}
@@ -70,6 +69,7 @@ func (r *Reader) Finalize() error {
 	return nil
 }
 
-func (r *Reader) Discard() (int64, error) {
-	return r.r.WriteTo(ioutil.Discard)
+func (r *Reader) Discard() error {
+	_, err := r.r.WriteTo(ioutil.Discard)
+	return err
 }

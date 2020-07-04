@@ -30,7 +30,7 @@ func parseStartupMessage(r *protocol.Reader) (hostPort string, user string, newS
 		}
 
 		// startupmessage is terminated by a 0x00 byte, which
-		// will be parsed by an empty string key
+		// will be parsed as an empty string key
 		if key == "" {
 			if err = r.Finalize(); err != nil {
 				e = err
@@ -194,33 +194,98 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	}
 
 	// start forwarding from server back to client
-	serverDone := make(chan error)
+	serverDone := make(chan bool)
 	go func() {
-		_, err := io.Copy(serverConn, clientConn)
-		serverDone <- err
+		_, err := io.Copy(clientConn, serverConn)
+		if err != nil {
+			p.log.Errorf("Server closed with error: %v", err)
+		}
 		close(serverDone)
 	}()
 
-	clientDone := make(chan error)
+	clientDone := make(chan bool)
 	go func() {
-		_, err := io.Copy(clientConn, serverConn)
-		clientDone <- err
+		err := p.LogCommands(serverConn, clientConn)
+		if err == io.EOF {
+			err = nil
+		} else if err != nil {
+			p.log.Errorf("Client closed with error: %v", err)
+		}
 		close(clientDone)
 	}()
 
-	clientErr := <-clientDone
-	serverErr := <-serverDone
-
-	if clientErr != nil {
-		p.log.Errorf("Client closed with error:", clientErr)
-	}
-	if serverErr != nil {
-		p.log.Errorf("Server closed with error:", serverErr)
-	}
+	<-clientDone
+	<-serverDone
 
 	p.log.Infof("Client disconneted")
 
 	return nil
+}
+
+func (p *ProxyConnection) LogCommands(serverConn, clientConn net.Conn) error {
+	msgTypeBuf := []byte{0}
+
+	tee := io.TeeReader(clientConn, serverConn)
+	for {
+		_, err := tee.Read(msgTypeBuf)
+		if err != nil {
+			return err
+		}
+		msgType := msgTypeBuf[0]
+
+		msg, err := protocol.ReadMessage(tee)
+		if err != nil {
+			return err
+		}
+
+		fields := logrus.Fields{}
+
+		switch msgType {
+		case protocol.BindMessageType:
+			err = handleBind(msg, fields)
+
+		case protocol.CloseMessageType:
+			err = handleClose(msg, fields)
+
+		case protocol.CopyDataMessageType:
+			err = handleCopyData(msg, fields)
+
+		case protocol.CopyDoneMessageType:
+			err = handleCopyDone(msg, fields)
+
+		case protocol.CopyFailMessageType:
+			err = handleCopyFail(msg, fields)
+
+		case protocol.DescribeMessageType:
+			err = handleDescribe(msg, fields)
+
+		case protocol.ExecuteMessageType:
+			err = handleExecute(msg, fields)
+
+		case protocol.FunctionCallMessageType:
+			err = handleFunctionCall(msg, fields)
+
+		case protocol.SimpleQueryMessageType:
+			err = handleSimpleQuery(msg, fields)
+
+		case protocol.ParseMessageType:
+			err = handleParse(msg, fields)
+
+		default:
+			fields["type"] = string(msgType)
+			fields["len"] = msg.Len
+			err = msg.Discard()
+		}
+
+		if err != nil && err != io.EOF {
+			fields["ioerror"] = err.Error()
+		}
+
+		p.log.WithFields(fields).Info("Client command")
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func (p *ProxyConnection) ConnectBackend(host string) (net.Conn, error) {
