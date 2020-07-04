@@ -96,7 +96,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			return err
 		}
 
-		if p.c.ServerTLS.BaseTLSConfig != nil {
+		if p.c.Server.BaseTLSConfig != nil {
 			p.log.Debugf("Upgrading SSL connection")
 			_, err := clientConn.Write([]byte{protocol.SSLAllowed})
 			if err != nil {
@@ -105,7 +105,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			}
 
 			// Upgrade the connection
-			clientConn = tls.Server(clientConn, p.c.ServerTLS.BaseTLSConfig.Clone())
+			clientConn = tls.Server(clientConn, p.c.Server.BaseTLSConfig.Clone())
 		} else {
 			p.log.Debugf("SSL disabled, rejecting SSL handshake")
 			_, err := clientConn.Write([]byte{protocol.SSLNotAllowed})
@@ -139,7 +139,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			return err
 		}
 	} else { // non-SSL startup packet
-		if p.c.ServerTLS.BaseTLSConfig != nil && p.c.ServerTLS.AllowUnencrypted == false {
+		if p.c.Server.BaseTLSConfig != nil && p.c.Server.AllowUnencrypted == false {
 			p.log.Info("Rejecting client without SSL because allowUnecrypted is false")
 			return errors.New("Rejecting client not using SSL")
 		}
@@ -210,7 +210,7 @@ func (p *ProxyConnection) ConnectBackend(host string) (net.Conn, error) {
 		return nil, err
 	}
 
-	if !p.c.ClientTLS.TrySSL {
+	if !p.c.Client.TrySSL {
 		return conn, nil
 	}
 
@@ -246,14 +246,14 @@ func (p *ProxyConnection) ConnectBackend(host string) (net.Conn, error) {
 	 */
 	if sslResponseBuf[0] != protocol.SSLAllowed {
 		p.log.Debug("Backend SSL unsupported")
-		if !p.c.ClientTLS.AllowUnencrypted {
+		if !p.c.Client.AllowUnencrypted {
 			conn.Close()
 			return nil, errors.New("Backend does not support SSL")
 		}
 		p.log.Debug("Continuing with unencrypted connection")
 	} else {
 		p.log.Debug("Attempting to upgrade backend connection to SSL")
-		conn := tls.Client(conn, p.c.ClientTLS.BaseTLSConfig.Clone())
+		conn := tls.Client(conn, p.c.Client.BaseTLSConfig.Clone())
 		if err != nil {
 			conn.Close()
 			return nil, fmt.Errorf("Error upgrading to SSL: %w", err)
