@@ -34,18 +34,18 @@ func NewServer(c *config.Config) *Server {
 	return s
 }
 
-func (s *Server) Start() {
+func (s *Server) Start() error {
 	log.Info("Server starting...")
-
 	proxyListener, err := net.Listen("tcp", s.c.HostPort)
 	if err != nil {
 		log.Fatalf("Could not create listener on %v: %v\n", s.c.HostPort, err)
-		return
+		return err
 	}
 
 	s.proxy.Serve(proxyListener)
 
 	log.Info("Server exiting...")
+	return nil
 }
 
 func (s *Server) Stop() {

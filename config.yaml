@@ -1,5 +1,5 @@
 hostPort: ":5000"
-credentials:
-  ssl:
-    enable: false
-    sslmode: disable
+server:
+  allowUnencrypted: true
+client:
+  allowUnencrypted: true

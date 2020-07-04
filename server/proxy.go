@@ -32,7 +32,7 @@ func NewProxyServer(c *config.Config) *ProxyServer {
 	p := &ProxyServer{
 		ch: make(chan bool),
 		p: &proxy.Proxy{
-			SSLConfig: &c.SSLConfig,
+			Config: c,
 		},
 	}
 

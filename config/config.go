@@ -1,99 +1,69 @@
-/*
-Copyright 2017 Crunchy Data Solutions, Inc.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package config
 
 import (
-	"github.com/spf13/viper"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"io/ioutil"
 
-	"github.com/twooster/pg-jump/util/log"
+	"github.com/twooster/pg-jump/config/file"
 )
 
-func init() {
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
+type ClientTLSConfig struct {
+	AllowUnencrypted bool
+	TrySSL           bool
+	BaseTLSConfig    tls.Config
 }
 
-type SSLConfig struct {
-	Enable        bool   `mapstructure:"enable"`
-	SSLMode       string `mapstructure:"sslmode"`
-	SSLCert       string `mapstructure:"sslcert,omitempty"`
-	SSLKey        string `mapstructure:"sslkey,omitempty"`
-	SSLRootCA     string `mapstructure:"sslrootca,omitempty"`
-	SSLServerCert string `mapstructure:"sslservercert,omitempty"`
-	SSLServerKey  string `mapstructure:"sslserverkey,omitempty"`
-	SSLServerCA   string `mapstructure:"sslserverca,omitempty"`
+type ServerTLSConfig struct {
+	AllowUnencrypted bool
+	BaseTLSConfig    *tls.Config
 }
 
 type Config struct {
-	HostPort  string    `mapstructure:"hostport"`
-	SSLConfig SSLConfig `mapstructure:"ssl"`
+	HostPort  string
+	ClientTLS ClientTLSConfig
+	ServerTLS ServerTLSConfig
 }
 
-func Get(key string) interface{} {
-	return viper.Get(key)
-}
-
-func GetBool(key string) bool {
-	return viper.GetBool(key)
-}
-
-func GetInt(key string) int {
-	return viper.GetInt(key)
-}
-
-func GetString(key string) string {
-	return viper.GetString(key)
-}
-
-func GetStringMapString(key string) map[string]string {
-	return viper.GetStringMapString(key)
-}
-
-func GetStringMap(key string) map[string]interface{} {
-	return viper.GetStringMap(key)
-}
-
-func GetStringSlice(key string) []string {
-	return viper.GetStringSlice(key)
-}
-
-func IsSet(key string) bool {
-	return viper.IsSet(key)
-}
-
-func Set(key string, value interface{}) {
-	viper.Set(key, value)
-}
-
-func SetConfigPath(path string) {
-	viper.SetConfigFile(path)
-}
-
-func ReadConfig() (*Config, error) {
-	log.Debugf("Reading configuration file: %s", viper.ConfigFileUsed())
-
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
+func FromFile(f *file.Config) (*Config, error) {
+	c := Config{
+		HostPort: f.HostPort,
+		ClientTLS: ClientTLSConfig{
+			AllowUnencrypted: f.Client.AllowUnencrypted,
+			TrySSL:           f.Client.TrySSL,
+		},
+		ServerTLS: ServerTLSConfig{
+			AllowUnencrypted: f.Server.AllowUnencrypted,
+		},
 	}
 
-	c := &Config{}
-
-	if err := viper.Unmarshal(c); err != nil {
-		log.Errorf("Error unmarshaling configuration file: %s", viper.ConfigFileUsed())
-		return nil, err
+	if f.Server.Cert != "" || f.Server.Key != "" {
+		cert, err := tls.LoadX509KeyPair(f.Server.Cert, f.Server.Key)
+		if err != nil {
+			return nil, fmt.Errorf("Error loading server SSL keypair: %w", err)
+		}
+		c.ServerTLS.BaseTLSConfig.Certificates = []tls.Certificate{cert}
+	} else if f.Server.AllowUnencrypted == false {
+		return nil, fmt.Errorf("Server allowUnencrypted is false, but no SSL keypair specified")
 	}
-	return c, nil
+
+	if f.Client.Cert != "" || f.Client.Key != "" {
+		cert, err := tls.LoadX509KeyPair(f.Client.Cert, f.Client.Key)
+		if err != nil {
+			return nil, fmt.Errorf("Error loading client SSL keypair: %w", err)
+		}
+		c.ClientTLS.BaseTLSConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	if f.Client.RootCA != "" {
+		rootCA, err := ioutil.ReadFile(f.Client.RootCA)
+		if err != nil {
+			return nil, fmt.Errorf("Error loading client Root CA: %w", err)
+		}
+		c.ClientTLS.BaseTLSConfig.RootCAs = x509.NewCertPool()
+		c.ClientTLS.BaseTLSConfig.RootCAs.AppendCertsFromPEM(rootCA)
+	}
+
+	return &c, nil
 }

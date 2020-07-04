@@ -19,20 +19,52 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/twooster/pg-jump/config"
+	"github.com/twooster/pg-jump/config/file"
+	"github.com/twooster/pg-jump/server"
+	"github.com/twooster/pg-jump/util/log"
 )
 
-var mainCmd = &cobra.Command{
-	Use:          "pg-jump",
-	Short:        "A simple Postgres jump server",
-	SilenceUsage: true,
-}
+var configPath string
+var logLevel string
+var logFormat string
 
 func init() {
-	mainCmd.AddCommand(
-		startCmd,
-	)
+	mainCmd.Flags().StringVarP(&configPath, "config", "c", "", "path to configuration file")
+	mainCmd.Flags().StringVarP(&logLevel, "log-level", "", "info", "log level")
+	mainCmd.Flags().StringVarP(&logFormat, "log-format", "", "plain", "the log output format")
 }
 
+var mainCmd = &cobra.Command{
+	Use:   "pg-jump",
+	Short: "A simple Postgres jump server",
+	Run:   runStart,
+}
+
+func runStart(cmd *cobra.Command, args []string) {
+	log.SetLevel(logLevel)
+
+	if configPath != "" {
+		file.SetConfigPath(configPath)
+	}
+
+	f, err := file.ReadConfig()
+	if err != nil {
+		log.Fatalf("Error reading config: %v", err)
+		return
+	}
+
+	c, err := config.FromFile(f)
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+
+	s := server.NewServer(c)
+
+	s.Start()
+
+	return
+}
 func Main() {
 	if err := Run(os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed running %q\n", os.Args[1])
