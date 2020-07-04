@@ -18,7 +18,7 @@ type ProxyConnection struct {
 	c   *config.Config
 }
 
-func parseStartupMessage(r *protocol.Reader) (hostPort string, newStartupMessage *protocol.Buffer, e error) {
+func parseStartupMessage(r *protocol.Reader) (hostPort string, user string, newStartupMessage *protocol.Buffer, e error) {
 	var database string
 	props := map[string]string{}
 
@@ -47,19 +47,29 @@ func parseStartupMessage(r *protocol.Reader) (hostPort string, newStartupMessage
 
 		if key == "database" {
 			database = val
+		} else if key == "user" {
+			user = val
 		} else {
 			props[key] = val
 		}
 	}
 
+	if user == "" {
+		return "", "", nil, errors.New("user field empty")
+	}
+	if database == "" {
+		return "", "", nil, errors.New("database field empty")
+	}
 	// parse database: host:port/database
 	var split []string
 	split = strings.SplitN(database, "/", 2)
 	if len(split) != 2 {
-		return "", nil, errors.New("Database string missing /")
+		return "", "", nil, errors.New("Database string missing /")
 	}
 	hostPort = split[0]
+
 	props["database"] = split[1]
+	props["user"] = user
 
 	newStartupMessage = protocol.NewBuffer()
 	newStartupMessage.WriteInt32(protocol.ProtocolVersion)
@@ -156,13 +166,18 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		return err
 	}
 
-	hostPort, newStartupMessage, err := parseStartupMessage(r)
+	hostPort, user, newStartupMessage, err := parseStartupMessage(r)
 	if err != nil {
 		p.log.Errorf("Unable to parse startup message from client: %v", err)
 		// send error to client
 		return err
 	}
+	p.log = p.log.WithFields(logrus.Fields{
+		"user":    user,
+		"backend": hostPort,
+	})
 
+	p.log.Info("Connecting to backend")
 	serverConn, err := p.ConnectBackend(hostPort)
 	if err != nil {
 		p.log.Errorf("Unable to connect to backend %v: %v", hostPort, err)
