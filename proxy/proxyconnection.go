@@ -105,7 +105,12 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			}
 
 			// Upgrade the connection
-			clientConn = tls.Server(clientConn, p.c.Server.BaseTLSConfig.Clone())
+			sslConn := tls.Server(clientConn, p.c.Server.BaseTLSConfig.Clone())
+			if err = sslConn.Handshake(); err != nil {
+				p.log.Warnf("Error performing SSL handshake: %v", err)
+				return err
+			}
+			clientConn = sslConn
 		} else {
 			p.log.Debugf("SSL disabled, rejecting SSL handshake")
 			_, err := clientConn.Write([]byte{protocol.SSLNotAllowed})
@@ -253,12 +258,15 @@ func (p *ProxyConnection) ConnectBackend(host string) (net.Conn, error) {
 		p.log.Debug("Continuing with unencrypted connection")
 	} else {
 		p.log.Debug("Attempting to upgrade backend connection to SSL")
-		conn := tls.Client(conn, p.c.Client.BaseTLSConfig.Clone())
-		if err != nil {
+
+		sslConn := tls.Client(conn, p.c.Client.BaseTLSConfig.Clone())
+		if err = sslConn.Handshake(); err != nil {
 			conn.Close()
 			return nil, fmt.Errorf("Error upgrading to SSL: %w", err)
 		}
+
 		p.log.Debug("Connection successfully upgraded")
+		conn = sslConn
 	}
 
 	return conn, nil
