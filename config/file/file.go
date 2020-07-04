@@ -30,13 +30,14 @@ func init() {
 type ServerConfig struct {
 	Cert             string `mapstructure:"cert,omitempty"`
 	Key              string `mapstructure:"key,omitempty"`
+	CA               string `mapstructure:"ca,omitempty"`
 	AllowUnencrypted bool   `mapstructure:"allowunencrypted,omitempty"`
 }
 
 type ClientConfig struct {
 	Cert             string `mapstructure:"cert,omitempty"`
 	Key              string `mapstructure:"key,omitempty"`
-	RootCA           string `mapstructure:"rootca,omitempty"`
+	CA               string `mapstructure:"ca,omitempty"`
 	SkipVerifyCA     bool   `mapstructure:"skipverify,omitempty"`
 	AllowUnencrypted bool   `mapstructure:"allowunencrypted,omitempty"`
 	TrySSL           bool   `mapstructure:"tryssl"`
