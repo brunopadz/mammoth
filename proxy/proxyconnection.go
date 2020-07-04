@@ -173,8 +173,8 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		return err
 	}
 	p.log = p.log.WithFields(logrus.Fields{
-		"user":    user,
-		"backend": hostPort,
+		"user":   user,
+		"server": hostPort,
 	})
 
 	p.log.Info("Connecting to backend")

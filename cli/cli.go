@@ -43,6 +43,7 @@ var mainCmd = &cobra.Command{
 
 func runStart(cmd *cobra.Command, args []string) {
 	log.SetLevel(logLevel)
+	log.SetFormat(logFormat)
 
 	if configPath != "" {
 		file.SetConfigPath(configPath)

@@ -31,7 +31,7 @@ func (p *Proxy) HandleConnection(conn net.Conn) error {
 	return (&ProxyConnection{
 		c: p.Config,
 		log: log.WithFields(logrus.Fields{
-			"remoteAddr": conn.RemoteAddr(),
+			"client": conn.RemoteAddr().String(),
 		}),
 	}).HandleConnection(conn)
 }

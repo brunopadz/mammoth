@@ -15,6 +15,7 @@ limitations under the License.
 package log
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/Sirupsen/logrus"
@@ -29,7 +30,6 @@ var levels = []string{
 
 func init() {
 	logrus.SetFormatter(&logrus.TextFormatter{
-		ForceColors:   true,
 		FullTimestamp: true,
 	})
 	logrus.SetOutput(os.Stdout)
@@ -71,12 +71,27 @@ func WithFields(f logrus.Fields) *logrus.Entry {
 	return logrus.WithFields(f)
 }
 
-func SetLevel(level string) {
+func SetLevel(level string) error {
 	logrusLevel, err := logrus.ParseLevel(level)
 
 	if err != nil {
-		logrus.Fatalf("\"%s\" is not a valid logging level", level)
+		return err
 	}
 
 	logrus.SetLevel(logrusLevel)
+	return nil
+}
+
+func SetFormat(format string) error {
+	switch format {
+	case "plain":
+		logrus.SetFormatter(&logrus.TextFormatter{
+			FullTimestamp: true,
+		})
+	case "json":
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	default:
+		return fmt.Errorf("Unknown log format: %s", format)
+	}
+	return nil
 }
