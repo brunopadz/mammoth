@@ -32,7 +32,6 @@ const (
 	RowDescriptionMessageType  byte = 'T'
 	DataRowMessageType         byte = 'D'
 	CommandCompleteMessageType byte = 'C'
-	TerminateMessageType       byte = 'X'
 	NoticeMessageType          byte = 'N'
 	PasswordMessageType        byte = 'p'
 	ReadyForQueryMessageType   byte = 'Z'
@@ -47,6 +46,8 @@ const (
 	FunctionCallMessageType byte = 'F'
 	ParseMessageType        byte = 'P'
 	SimpleQueryMessageType  byte = 'Q'
+	SyncMessageType         byte = 'S'
+	TerminateMessageType    byte = 'X'
 )
 
 /* PostgreSQL Authentication Method constants. */

@@ -205,7 +205,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 
 	clientDone := make(chan bool)
 	go func() {
-		err := p.LogCommands(serverConn, clientConn)
+		err := p.CopyAndLogCommands(serverConn, clientConn)
 		if err == io.EOF {
 			err = nil
 		} else if err != nil {
@@ -214,17 +214,20 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		close(clientDone)
 	}()
 
+	// TODO[tmw]: Can these hang?
 	<-clientDone
 	<-serverDone
 
-	p.log.Infof("Client disconneted")
+	p.log.Infof("Client disconnected")
 
 	return nil
 }
 
-func (p *ProxyConnection) LogCommands(serverConn, clientConn net.Conn) error {
+func (p *ProxyConnection) CopyAndLogCommands(serverConn, clientConn net.Conn) error {
 	msgTypeBuf := []byte{0}
 
+	// Every byte that's read out of the tee will be sent straight to
+	// the postgres server
 	tee := io.TeeReader(clientConn, serverConn)
 	for {
 		_, err := tee.Read(msgTypeBuf)
@@ -265,14 +268,21 @@ func (p *ProxyConnection) LogCommands(serverConn, clientConn net.Conn) error {
 		case protocol.FunctionCallMessageType:
 			err = handleFunctionCall(msg, fields)
 
-		case protocol.SimpleQueryMessageType:
-			err = handleSimpleQuery(msg, fields)
-
 		case protocol.ParseMessageType:
 			err = handleParse(msg, fields)
 
+		case protocol.SimpleQueryMessageType:
+			err = handleSimpleQuery(msg, fields)
+
+		case protocol.SyncMessageType:
+			err = handleSync(msg, fields)
+
+		case protocol.TerminateMessageType:
+			err = handleTerminate(msg, fields)
+
 		default:
-			fields["type"] = string(msgType)
+			fields["type"] = "Unknown"
+			fields["code"] = int(msgType)
 			fields["len"] = msg.Len
 			err = msg.Discard()
 		}
@@ -281,7 +291,7 @@ func (p *ProxyConnection) LogCommands(serverConn, clientConn net.Conn) error {
 			fields["ioerror"] = err.Error()
 		}
 
-		p.log.WithFields(fields).Info("Client command")
+		p.log.WithFields(fields).Info("Command")
 		if err != nil {
 			return err
 		}

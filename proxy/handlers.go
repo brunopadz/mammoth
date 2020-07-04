@@ -427,3 +427,29 @@ func handleFunctionCall(m *protocol.Reader, fields map[string]interface{}) error
 
 	return m.Discard()
 }
+
+/*
+Sync (F)
+Byte1('S')
+Identifies the message as a Sync command.
+
+Int32(4)
+Length of message contents in bytes, including self.
+*/
+func handleSync(m *protocol.Reader, fields map[string]interface{}) error {
+	fields[typeField] = "Sync"
+	return m.Finalize()
+}
+
+/*
+Terminate (F)
+Byte1('X')
+Identifies the message as a termination.
+
+Int32(4)
+Length of message contents in bytes, including self.
+*/
+func handleTerminate(m *protocol.Reader, fields map[string]interface{}) error {
+	fields[typeField] = "Terminate"
+	return m.Finalize()
+}
