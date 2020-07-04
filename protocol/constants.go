@@ -16,8 +16,9 @@ package protocol
 
 /* PostgreSQL Protocol Version/Code constants */
 const (
-	ProtocolVersion int32 = 196608
-	SSLRequestCode  int32 = 80877103
+	ProtocolVersion   int32 = 196608
+	CancelRequestCode int32 = 80877102
+	SSLRequestCode    int32 = 80877103
 
 	/* SSL Responses */
 	SSLAllowed    byte = 'S'

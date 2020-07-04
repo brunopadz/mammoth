@@ -77,7 +77,7 @@ func parseStartupMessage(r *protocol.Reader) (hostPort string, user string, newS
 		newStartupMessage.WriteString(k)
 		newStartupMessage.WriteString(v)
 	}
-	newStartupMessage.WriteByte(0x00)
+	newStartupMessage.WriteByte(0)
 	return
 }
 
@@ -153,23 +153,36 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			p.log.Errorf("Error reading StartupMessage after SSL upgrade: %w", err)
 			return err
 		}
-	} else { // non-SSL startup packet
+	} else if version == protocol.ProtocolVersion { // non-SSL startup packet
 		if p.c.Server.BaseTLSConfig != nil && p.c.Server.AllowUnencrypted == false {
 			p.log.Info("Rejecting client without SSL because allowUnecrypted is false")
 			return errors.New("Rejecting client not using SSL")
 		}
+	} else if version == protocol.CancelRequestCode {
+		p.log.Infof("Client attempted to cancel a query; this is not supported")
+		// Cancelling can't be handled
+		protocol.WriteError(clientConn, protocol.Error{
+			Severity: protocol.ErrorSeverityFatal,
+			Code:     protocol.ErrorCodeFeatureNotSupported,
+			Message:  "Cancellation not supported by pg-jump",
+		})
+		return err
 	}
 
 	if version != protocol.ProtocolVersion {
 		p.log.Errorf("Invalid protocol version from client: %v", version)
-		// send error to client
 		return err
 	}
 
 	hostPort, user, newStartupMessage, err := parseStartupMessage(r)
 	if err != nil {
 		p.log.Errorf("Unable to parse startup message from client: %v", err)
-		// send error to client
+		protocol.WriteError(clientConn, protocol.Error{
+			Severity: protocol.ErrorSeverityFatal,
+			Code:     protocol.ErrorCodeConnectionFailure,
+			Message:  "Unable to parse connection string",
+			Detail:   err.Error(),
+		})
 		return err
 	}
 	p.log = p.log.WithFields(logrus.Fields{
@@ -181,7 +194,12 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	serverConn, err := p.ConnectBackend(hostPort)
 	if err != nil {
 		p.log.Errorf("Unable to connect to backend %v: %v", hostPort, err)
-		// send error to client
+		protocol.WriteError(clientConn, protocol.Error{
+			Severity: protocol.ErrorSeverityFatal,
+			Code:     protocol.ErrorCodeClientUnableToConnect,
+			Message:  "Unable to connect to remote backend",
+			Detail:   err.Error(),
+		})
 		return err
 	}
 	defer serverConn.Close()
@@ -189,7 +207,12 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	err = newStartupMessage.WriteTo(serverConn)
 	if err != nil {
 		p.log.Errorf("Error writing StartupMessage to remote server: %v", err)
-		// send error to client
+		protocol.WriteError(clientConn, protocol.Error{
+			Severity: protocol.ErrorSeverityFatal,
+			Code:     protocol.ErrorCodeClientUnableToConnect,
+			Message:  "Network error communicating with backend server",
+			Detail:   err.Error(),
+		})
 		return nil
 	}
 
