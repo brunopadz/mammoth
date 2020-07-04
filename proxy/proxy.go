@@ -30,7 +30,7 @@ import (
 type Proxy struct {
 }
 
-func parseStartupMessage(r *protocol.PostgresReader) (hostPort string, newStartupMessage *protocol.PostgresBuffer, e error) {
+func parseStartupMessage(r *protocol.Reader) (hostPort string, newStartupMessage *protocol.Buffer, e error) {
 	var database string
 	props := map[string]string{}
 

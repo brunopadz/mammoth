@@ -8,44 +8,44 @@ import (
 	"math"
 )
 
-type PostgresBuffer struct {
+type Buffer struct {
 	msgType     byte
 	b           *bytes.Buffer
 	multiReader io.Reader
 }
 
-func NewPostgresBuffer(msgType byte) *PostgresBuffer {
-	return &PostgresBuffer{
+func NewPostgresBuffer(msgType byte) *Buffer {
+	return &Buffer{
 		msgType: msgType,
 		b:       &bytes.Buffer{},
 	}
 }
 
-func (p *PostgresBuffer) Write(b []byte) error {
+func (p *Buffer) Write(b []byte) error {
 	// always returns nil error, according to doc'm
 	p.b.Write(b)
 	return nil
 }
 
-func (p *PostgresBuffer) WriteInt16(i int16) error {
+func (p *Buffer) WriteInt16(i int16) error {
 	return binary.Write(p.b, binary.BigEndian, i)
 }
 
-func (p *PostgresBuffer) WriteInt32(i int32) error {
+func (p *Buffer) WriteInt32(i int32) error {
 	return binary.Write(p.b, binary.BigEndian, i)
 }
 
-func (p *PostgresBuffer) WriteByte(b byte) error {
+func (p *Buffer) WriteByte(b byte) error {
 	return p.b.WriteByte(b)
 }
 
-func (p *PostgresBuffer) WriteString(str string) error {
+func (p *Buffer) WriteString(str string) error {
 	// err is always nil, according to doc'm
 	p.b.WriteString(str)
 	return p.b.WriteByte(0x00)
 }
 
-func (p *PostgresBuffer) WriteTo(w io.Writer) error {
+func (p *Buffer) WriteTo(w io.Writer) error {
 	len := p.b.Len() + 4
 	if len > math.MaxInt32 {
 		return errors.New("Length of message too large")
@@ -67,7 +67,12 @@ func (p *PostgresBuffer) WriteTo(w io.Writer) error {
 	return err
 }
 
-func (p *PostgresBuffer) Read(b []byte) (int, error) {
+func (p *Buffer) Read(b []byte) (int, error) {
+	len := p.b.Len() + 4
+	if len > math.MaxInt32 {
+		return 0, errors.New("Length of message too large")
+	}
+
 	if p.multiReader == nil {
 		var header *bytes.Buffer
 		if p.msgType != 0 {
