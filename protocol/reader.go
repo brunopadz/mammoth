@@ -8,7 +8,12 @@ import (
 	"io/ioutil"
 )
 
-func newReader(msgType byte, r io.Reader) (*Reader, error) {
+type Reader struct {
+	r   *bufio.Reader
+	Len int32
+}
+
+func ReadMessage(r io.Reader) (*Reader, error) {
 	var sz int32
 	err := binary.Read(r, binary.BigEndian, &sz)
 	if err != nil {
@@ -18,35 +23,13 @@ func newReader(msgType byte, r io.Reader) (*Reader, error) {
 	if sz < 4 {
 		return nil, errors.New("Message size < 4 or overflow")
 	}
+	sz -= 4
 
-	lr := io.LimitReader(r, int64(sz-4))
-	return NewPostgresReader(0x00, lr), nil
-}
-
-func ReadStartupMessage(r io.Reader) (*Reader, error) {
-	return newReader(0x00, r)
-}
-
-func ReadMessage(r io.Reader) (*Reader, error) {
-	var msgType byte
-	err := binary.Read(r, binary.BigEndian, &msgType)
-	if err != nil {
-		return nil, err
-	}
-
-	return newReader(msgType, r)
-}
-
-type Reader struct {
-	MsgType byte
-	r       *bufio.Reader
-}
-
-func NewPostgresReader(msgType byte, r io.Reader) *Reader {
+	lr := io.LimitReader(r, int64(sz))
 	return &Reader{
-		MsgType: msgType,
-		r:       bufio.NewReader(r),
-	}
+		Len: sz,
+		r:   bufio.NewReader(lr),
+	}, nil
 }
 
 func (r *Reader) Read(b []byte) (int, error) {

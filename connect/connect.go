@@ -22,16 +22,6 @@ import (
 	"github.com/twooster/pg-jump/util/log"
 )
 
-func Send(connection net.Conn, message []byte) (int, error) {
-	return connection.Write(message)
-}
-
-func Receive(connection net.Conn) ([]byte, int, error) {
-	buffer := make([]byte, 4096)
-	length, err := connection.Read(buffer)
-	return buffer, length, err
-}
-
 func Connect(host string) (net.Conn, error) {
 	connection, err := net.Dial("tcp", host)
 
@@ -51,10 +41,8 @@ func Connect(host string) (net.Conn, error) {
 		 */
 
 		/* Create the SSL request message. */
-		message := protocol.NewPostgresBuffer(0x00)
+		message := protocol.NewBuffer()
 		message.WriteInt32(protocol.SSLRequestCode)
-
-		/* Send the SSL request message. */
 		err := message.WriteTo(connection)
 
 		if err != nil {
@@ -64,7 +52,7 @@ func Connect(host string) (net.Conn, error) {
 		}
 
 		/* Receive SSL response message. */
-		sslResponseBuf := make([]byte, 1)
+		sslResponseBuf := []byte{0}
 		_, err = connection.Read(sslResponseBuf)
 
 		if err != nil {

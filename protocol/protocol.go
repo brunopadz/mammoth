@@ -15,8 +15,7 @@ limitations under the License.
 package protocol
 
 import (
-	"bytes"
-	"encoding/binary"
+	"io"
 )
 
 /* PostgreSQL Protocol Version/Code constants */
@@ -57,71 +56,8 @@ const (
 	AuthenticationSSPI        int32 = 9
 )
 
-func GetVersion(message []byte) int32 {
-	var code int32
-
-	reader := bytes.NewReader(message[4:8])
-	binary.Read(reader, binary.BigEndian, &code)
-
-	return code
-}
-
-/*
- * Get the message type the provided message.
- *
- * message - the message
- */
-func GetMessageType(message []byte) byte {
-	return message[0]
-}
-
-/*
- * Get the message length of the provided message.
- *
- * message - the message
- */
-func GetMessageLength(message []byte) int32 {
-	var messageLength int32
-
-	reader := bytes.NewReader(message[1:5])
-	binary.Read(reader, binary.BigEndian, &messageLength)
-
-	return messageLength
-}
-
-/* IsAuthenticationOk
- *
- * Check an Authentication Message to determine if it is an AuthenticationOK
- * message.
- */
-func IsAuthenticationOk(message []byte) bool {
-	/*
-	 * If the message type is not an Authentication message, then short circuit
-	 * and return false.
-	 */
-	if GetMessageType(message) != AuthenticationMessageType {
-		return false
-	}
-
-	var messageValue int32
-
-	// Get the message length.
-	messageLength := GetMessageLength(message)
-
-	// Get the message value.
-	reader := bytes.NewReader(message[5:9])
-	binary.Read(reader, binary.BigEndian, &messageValue)
-
-	return (messageLength == 8 && messageValue == AuthenticationOk)
-}
-
-func GetTerminateMessage() []byte {
-	var buffer []byte
-	buffer = append(buffer, 'X')
-
-	//make msg len 1 for now
-	x := make([]byte, 4)
-	binary.BigEndian.PutUint32(x, uint32(4))
-	buffer = append(buffer, x...)
-	return buffer
+func ReadMessageType(r io.Reader) (byte, error) {
+	buf := []byte{0}
+	_, err := r.Read(buf)
+	return buf[0], err
 }

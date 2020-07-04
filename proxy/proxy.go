@@ -73,7 +73,7 @@ func parseStartupMessage(r *protocol.Reader) (hostPort string, newStartupMessage
 	hostPort = split[0]
 	props["database"] = split[1]
 
-	newStartupMessage = protocol.NewPostgresBuffer(0x00)
+	newStartupMessage = protocol.NewBuffer()
 	newStartupMessage.WriteInt32(protocol.ProtocolVersion)
 	for k, v := range props {
 		newStartupMessage.WriteString(k)
@@ -87,7 +87,7 @@ func parseStartupMessage(r *protocol.Reader) (hostPort string, newStartupMessage
 func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 	log.Infof("Accepting connection from %v", clientConn.RemoteAddr())
 
-	r, err := protocol.ReadStartupMessage(clientConn)
+	r, err := protocol.ReadMessage(clientConn)
 	if err != nil {
 		return fmt.Errorf("Error reading initial StartupMessage: %w", err)
 	}
@@ -125,7 +125,7 @@ func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 		 * close the connection. This is not an 'error' condition as this is an
 		 * expected behavior from a client.
 		 */
-		r, err = protocol.ReadStartupMessage(clientConn)
+		r, err = protocol.ReadMessage(clientConn)
 		if err == io.EOF {
 			log.Info("Client rejected SSL upgrade")
 			return nil
@@ -192,6 +192,9 @@ func (p *Proxy) HandleConnection(clientConn net.Conn) error {
 
 	clientErr := <-clientDone
 	serverErr := <-serverDone
+	serverConn.Close()
+	clientConn.Close()
+
 	log.Infof("Server: %v, Client: %v", serverErr, clientErr)
 
 	return nil
