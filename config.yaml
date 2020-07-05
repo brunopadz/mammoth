@@ -1,5 +1,0 @@
-bind: ":5000"
-server:
-  allowUnencrypted: true
-client:
-  allowUnencrypted: true
