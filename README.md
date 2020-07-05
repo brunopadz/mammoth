@@ -21,4 +21,6 @@ TODO:
 
 ## Ps
 
-This is not the finest code. It is the functionaly-ist code.
+This is not the finest code. It is the functionaly-ist code. There aren't
+tests. This product may explode at any time. No warranties, no returns.
+Please have your pets spayed and neutered.
