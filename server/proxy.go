@@ -54,12 +54,7 @@ func (s *ProxyServer) Serve(l net.Listener) {
 			continue
 		}
 
-		go func() {
-			err := s.p.HandleConnection(conn)
-			if err != nil {
-				log.Infof("Connection error: %v\n", err)
-			}
-		}()
+		go s.p.HandleConnection(conn)
 	}
 }
 

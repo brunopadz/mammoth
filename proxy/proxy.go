@@ -15,6 +15,7 @@ limitations under the License.
 package proxy
 
 import (
+	"io"
 	"net"
 
 	"github.com/Sirupsen/logrus"
@@ -36,11 +37,22 @@ func NewProxy(c *config.Config) *Proxy {
 
 // HandleConnection handle an incoming connection to the proxy
 func (p *Proxy) HandleConnection(conn net.Conn) error {
-	return (&ProxyConnection{
+	l := log.WithFields(logrus.Fields{
+		"client": conn.RemoteAddr().String(),
+	})
+	l.Info("Accepting connection")
+
+	err := (&ProxyConnection{
 		c:       p.Config,
 		secrets: p.Secrets,
-		log: log.WithFields(logrus.Fields{
-			"client": conn.RemoteAddr().String(),
-		}),
+		log:     l,
 	}).HandleConnection(conn)
+
+	if err != nil && err != io.EOF {
+		l.Infof("Connection handling closed with error: %v", err)
+		return err
+	}
+
+	l.Info("Connection closed")
+	return nil
 }

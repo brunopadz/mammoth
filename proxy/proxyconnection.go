@@ -104,8 +104,6 @@ func (p *ProxyConnection) TrySSLUpgrade(conn net.Conn) (net.Conn, error) {
 func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	defer clientConn.Close()
 
-	p.log.Infof("Accepting connection")
-
 	r, err := protocol.ReadMessage(clientConn)
 	if err != nil {
 		p.log.Infof("Error reading initial StartupMessage: %w", err)
@@ -192,6 +190,8 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		}
 
 		p.log.Infof("Successfully sent cancellation to %v, pid %v", s.hostPort, pid)
+		// In theory, the server should drop the connection immediately after, so
+		// we don't await a response, and neither should the client.
 		return nil
 	} else if version != protocol.ProtocolVersion {
 		p.log.Infof("Unsupported protocol version from client: %v", version)
@@ -244,14 +244,14 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	p.log.Debug("Passing through data between client and server")
 	clientDone := make(chan bool)
 	go func() {
-		err := p.CopyAndLogCommands(serverConn, clientConn)
-		if err != nil && err == io.EOF {
+		err := p.PassthruAndLog(serverConn, clientConn)
+		if err != nil && err != io.EOF {
 			p.log.Infof("Client closed with error: %v", err)
 		}
 		close(clientDone)
 	}()
 
-	pid, secret, added, err := p.RewriteBackendDataPacket(clientConn, serverConn, hostPort)
+	pid, secret, added, err := p.PassthruAndRewriteBackendData(clientConn, serverConn, hostPort)
 	if added {
 		defer p.secrets.Remove(pid, secret)
 	}
@@ -278,7 +278,13 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	return nil
 }
 
-func (p *ProxyConnection) RewriteBackendDataPacket(clientConn, serverConn net.Conn, hostPort string) (pid int32, secret int32, added bool, err error) {
+// Copies data from the serverConn to the clientConn, parsing the packets
+// looking for a BackendKeyData message. This will be rewritten and stored
+// into the server-global secrets store and potentially given a new secret
+// that will be written to the client. In this way, we can handle cancellation.
+// Stops copying data after the first ReadyForQuery message is received,
+// which indicates that no further BackendDataPacket will be forthcoming.
+func (p *ProxyConnection) PassthruAndRewriteBackendData(clientConn, serverConn net.Conn, hostPort string) (pid int32, secret int32, added bool, err error) {
 	msgTypeBuf := make([]byte, 1)
 
 	for {
@@ -308,6 +314,11 @@ func (p *ProxyConnection) RewriteBackendDataPacket(clientConn, serverConn net.Co
 			if err != nil {
 				return
 			}
+			// If this is the second time we've seen the packet, let's
+			// remove the old entry since it's no longer relevant
+			if added {
+				p.secrets.Remove(pid, secret)
+			}
 			secret = p.secrets.Add(pid, secret, hostPort)
 			added = true
 
@@ -336,7 +347,9 @@ func (p *ProxyConnection) RewriteBackendDataPacket(clientConn, serverConn net.Co
 	}
 }
 
-func (p *ProxyConnection) CopyAndLogCommands(serverConn, clientConn net.Conn) error {
+// Parses all packets coming from the client conn to the server conn,
+// and logs all relevant commands to the logger
+func (p *ProxyConnection) PassthruAndLog(serverConn, clientConn net.Conn) error {
 	msgTypeBuf := make([]byte, 1)
 
 	// Every byte that's read out of the tee will be sent straight to
