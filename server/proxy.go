@@ -31,9 +31,7 @@ type ProxyServer struct {
 func NewProxyServer(c *config.Config) *ProxyServer {
 	p := &ProxyServer{
 		ch: make(chan bool),
-		p: &proxy.Proxy{
-			Config: c,
-		},
+		p:  proxy.NewProxy(c),
 	}
 
 	return p

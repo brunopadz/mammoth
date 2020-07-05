@@ -23,13 +23,22 @@ import (
 )
 
 type Proxy struct {
-	Config *config.Config
+	Config  *config.Config
+	Secrets *BackendSecrets
+}
+
+func NewProxy(c *config.Config) *Proxy {
+	return &Proxy{
+		Config:  c,
+		Secrets: NewBackendSecrets(),
+	}
 }
 
 // HandleConnection handle an incoming connection to the proxy
 func (p *Proxy) HandleConnection(conn net.Conn) error {
 	return (&ProxyConnection{
-		c: p.Config,
+		c:       p.Config,
+		secrets: p.Secrets,
 		log: log.WithFields(logrus.Fields{
 			"client": conn.RemoteAddr().String(),
 		}),

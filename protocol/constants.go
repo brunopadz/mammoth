@@ -28,6 +28,7 @@ const (
 /* PostgreSQL Message Type constants. */
 const (
 	AuthenticationMessageType  byte = 'R'
+	BackendKeyDataMessageType  byte = 'K'
 	ErrorMessageType           byte = 'E'
 	EmptyQueryMessageType      byte = 'I'
 	RowDescriptionMessageType  byte = 'T'

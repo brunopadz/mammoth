@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"crypto/tls"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -14,8 +15,9 @@ import (
 )
 
 type ProxyConnection struct {
-	log logrus.FieldLogger
-	c   *config.Config
+	log     logrus.FieldLogger
+	c       *config.Config
+	secrets *BackendSecrets
 }
 
 func parseStartupMessage(r *protocol.Reader) (hostPort string, user string, newStartupMessage *protocol.Buffer, e error) {
@@ -81,6 +83,24 @@ func parseStartupMessage(r *protocol.Reader) (hostPort string, user string, newS
 	return
 }
 
+func (p *ProxyConnection) TrySSLUpgrade(conn net.Conn) (net.Conn, error) {
+	if p.c.Server.BaseTLSConfig != nil {
+		p.log.Debug("Upgrading SSL connection")
+		_, err := conn.Write([]byte{protocol.SSLAllowed})
+		if err != nil {
+			return conn, err
+		}
+
+		// Upgrade the connection
+		sslConn := tls.Server(conn, p.c.Server.BaseTLSConfig.Clone())
+		return sslConn, sslConn.Handshake()
+	} else {
+		p.log.Debug("SSL disabled, rejecting SSL handshake")
+		_, err := conn.Write([]byte{protocol.SSLNotAllowed})
+		return conn, err
+	}
+}
+
 func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	defer clientConn.Close()
 
@@ -88,13 +108,13 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 
 	r, err := protocol.ReadMessage(clientConn)
 	if err != nil {
-		p.log.Errorf("Error reading initial StartupMessage: %w", err)
+		p.log.Infof("Error reading initial StartupMessage: %w", err)
 		return err
 	}
 
 	version, err := r.ReadInt32()
 	if err != nil {
-		p.log.Errorf("Error reading initial StartupMessage: %w", err)
+		p.log.Infof("Error reading initial StartupMessage: %w", err)
 		return err
 	}
 
@@ -102,34 +122,15 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		p.log.Debugf("Client requesting SSL upgrade")
 
 		if err := r.Finalize(); err != nil {
-			p.log.Errorf("Error upgrading to SSL connection: %w", err)
+			p.log.Infof("Malformed SSLRequest packet: %w", err)
 			return err
 		}
 
-		if p.c.Server.BaseTLSConfig != nil {
-			p.log.Debugf("Upgrading SSL connection")
-			_, err := clientConn.Write([]byte{protocol.SSLAllowed})
-			if err != nil {
-				p.log.Errorf("Error upgrading SSL connection: %w", err)
-				return err
-			}
-
-			// Upgrade the connection
-			sslConn := tls.Server(clientConn, p.c.Server.BaseTLSConfig.Clone())
-			if err = sslConn.Handshake(); err != nil {
-				p.log.Warnf("Error performing SSL handshake: %v", err)
-				return err
-			}
-			clientConn = sslConn
-		} else {
-			p.log.Debugf("SSL disabled, rejecting SSL handshake")
-			_, err := clientConn.Write([]byte{protocol.SSLNotAllowed})
-			if err != nil {
-				p.log.Errorf("Error rejecting SSL upgrade: %v", err)
-				return err
-			}
+		clientConn, err = p.TrySSLUpgrade(clientConn)
+		if err != nil {
+			p.log.Infof("Error performing SSL handshake: %w")
+			return err
 		}
-
 		/*
 		 * Re-read the startup message from the client. It is possible that the
 		 * client might not like the response given and as a result it might
@@ -138,45 +139,68 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		 */
 		r, err = protocol.ReadMessage(clientConn)
 		if err == io.EOF {
-			p.log.Info("Client rejected SSL response")
+			p.log.Info("Client rejected SSL response and closed connection")
 			return nil
 		} else if err != nil {
-			p.log.Errorf("Error reading StartupMessage after SSL response: %w", err)
+			p.log.Infof("Error reading StartupMessage after SSL handshake: %w", err)
 			return err
-		} else {
-			p.log.Debugf("Client accepted SSL response")
 		}
 
 		// Re-read protocol version
 		version, err = r.ReadInt32()
 		if err != nil {
-			p.log.Errorf("Error reading StartupMessage after SSL upgrade: %w", err)
+			p.log.Infof("Error reading StartupMessage after SSL handshake: %w", err)
 			return err
 		}
-	} else if version == protocol.ProtocolVersion { // non-SSL startup packet
+	} else { // non-SSL startup packet
 		if p.c.Server.BaseTLSConfig != nil && p.c.Server.AllowUnencrypted == false {
 			p.log.Info("Rejecting client without SSL because allowUnecrypted is false")
-			return errors.New("Rejecting client not using SSL")
+			return nil
 		}
 	}
 
 	if version == protocol.CancelRequestCode {
-		p.log.Infof("Client attempted to cancel a query; this is not supported")
-		// Cancelling can't be handled
-		protocol.WriteError(clientConn, protocol.Error{
-			Severity: protocol.ErrorSeverityFatal,
-			Code:     protocol.ErrorCodeFeatureNotSupported,
-			Message:  "Cancellation not supported by pg-jump",
-		})
-		return err
+		pid, err := r.ReadInt32()
+		if err != nil {
+			return err
+		}
+		secret, err := r.ReadInt32()
+		if err != nil {
+			return err
+		}
+		if err := r.Finalize(); err != nil {
+			return err
+		}
+		s, ok := p.secrets.Get(pid, secret)
+		if !ok {
+			return nil
+		}
+
+		p.log.Debug("Connecting to backend for cancellation")
+		serverConn, err := p.ConnectBackend(s.hostPort)
+		if err != nil {
+			p.log.Infof("Unable to connect to backend for cancellation %v: %v", s.hostPort, err)
+		}
+		defer serverConn.Close()
+
+		msg := protocol.NewBuffer()
+		msg.WriteInt32(protocol.CancelRequestCode)
+		msg.WriteInt32(pid)
+		msg.WriteInt32(s.origSecret)
+		if err := msg.WriteTo(serverConn); err != nil {
+			return err
+		}
+
+		p.log.Infof("Successfully sent cancellation to %v, pid %v", s.hostPort, pid)
+		return nil
 	} else if version != protocol.ProtocolVersion {
-		p.log.Errorf("Invalid protocol version from client: %v", version)
-		return err
+		p.log.Infof("Unsupported protocol version from client: %v", version)
+		return nil
 	}
 
 	hostPort, user, newStartupMessage, err := parseStartupMessage(r)
 	if err != nil {
-		p.log.Errorf("Unable to parse startup message from client: %v", err)
+		p.log.Infof("Unable to parse startup message from client: %v", err)
 		protocol.WriteError(clientConn, protocol.Error{
 			Severity: protocol.ErrorSeverityFatal,
 			Code:     protocol.ErrorCodeConnectionFailure,
@@ -185,15 +209,16 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		})
 		return err
 	}
+
 	p.log = p.log.WithFields(logrus.Fields{
 		"user":   user,
 		"server": hostPort,
 	})
 
-	p.log.Info("Connecting to backend")
+	p.log.Debug("Connecting to backend")
 	serverConn, err := p.ConnectBackend(hostPort)
 	if err != nil {
-		p.log.Errorf("Unable to connect to backend %v: %v", hostPort, err)
+		p.log.Infof("Unable to connect to backend %v: %v", hostPort, err)
 		protocol.WriteError(clientConn, protocol.Error{
 			Severity: protocol.ErrorSeverityFatal,
 			Code:     protocol.ErrorCodeClientUnableToConnect,
@@ -213,26 +238,35 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			Message:  "Network error communicating with backend server",
 			Detail:   err.Error(),
 		})
-		return nil
+		return err
 	}
 
-	// start forwarding from server back to client
-	serverDone := make(chan bool)
-	go func() {
-		_, err := io.Copy(clientConn, serverConn)
-		if err != nil {
-			p.log.Errorf("Server closed with error: %v", err)
-		}
-		close(serverDone)
-	}()
-
+	p.log.Debug("Passing through data between client and server")
 	clientDone := make(chan bool)
 	go func() {
 		err := p.CopyAndLogCommands(serverConn, clientConn)
 		if err != nil && err == io.EOF {
-			p.log.Errorf("Client closed with error: %v", err)
+			p.log.Infof("Client closed with error: %v", err)
 		}
 		close(clientDone)
+	}()
+
+	pid, secret, added, err := p.RewriteBackendDataPacket(clientConn, serverConn, hostPort)
+	if added {
+		defer p.secrets.Remove(pid, secret)
+	}
+	if err != nil {
+		return err
+	}
+
+	// start pass-thru copy
+	serverDone := make(chan bool)
+	go func() {
+		_, err := io.Copy(clientConn, serverConn)
+		if err != nil {
+			p.log.Infof("Server closed with error: %v", err)
+		}
+		close(serverDone)
 	}()
 
 	// TODO[tmw]: Can these hang?
@@ -244,8 +278,66 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 	return nil
 }
 
+func (p *ProxyConnection) RewriteBackendDataPacket(clientConn, serverConn net.Conn, hostPort string) (pid int32, secret int32, added bool, err error) {
+	msgTypeBuf := make([]byte, 1)
+
+	for {
+		_, err = serverConn.Read(msgTypeBuf)
+		if err != nil {
+			return
+		}
+		_, err = clientConn.Write(msgTypeBuf)
+		if err != nil {
+			return
+		}
+
+		msgType := msgTypeBuf[0]
+
+		var msg *protocol.Reader
+		msg, err = protocol.ReadMessage(serverConn)
+		if err != nil {
+			return
+		}
+
+		if msgType == protocol.BackendKeyDataMessageType {
+			pid, err = msg.ReadInt32()
+			if err != nil {
+				return
+			}
+			secret, err = msg.ReadInt32()
+			if err != nil {
+				return
+			}
+			secret = p.secrets.Add(pid, secret, hostPort)
+			added = true
+
+			msgOut := protocol.NewBuffer()
+			msgOut.WriteInt32(pid)
+			msgOut.WriteInt32(secret)
+			err = msgOut.WriteTo(clientConn)
+
+			if err != nil {
+				return
+			}
+		} else {
+			err = binary.Write(clientConn, binary.BigEndian, msg.Len)
+			if err != nil {
+				return
+			}
+			_, err = io.Copy(clientConn, msg)
+			if err != nil {
+				return
+			}
+			// We can stop listening once we've passed-thru the first ReadyForQuery
+			if msgType == protocol.ReadyForQueryMessageType {
+				return
+			}
+		}
+	}
+}
+
 func (p *ProxyConnection) CopyAndLogCommands(serverConn, clientConn net.Conn) error {
-	msgTypeBuf := []byte{0}
+	msgTypeBuf := make([]byte, 1)
 
 	// Every byte that's read out of the tee will be sent straight to
 	// the postgres server
