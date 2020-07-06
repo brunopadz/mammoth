@@ -2,7 +2,7 @@
 
 SSL_DIR="."
 
-DOMAIN="*.crunchy.lab"
+DOMAIN="localhost"
 
 PASSPHRASE="password"
 
@@ -14,7 +14,7 @@ O=Crunchy Data Solutions
 CN=$DOMAIN
 "
 
-CA_CN=root-ca.crunchy.lab
+CA_CN=root-ca.localhost
 
 mkdir -p server client
 
@@ -23,7 +23,7 @@ mkdir -p server client
 # ----
 
 # Create CA private key.
-openssl genrsa -aes256 -out ca.key -passout "pass:$PASSPHRASE" 4096 
+openssl genrsa -aes256 -out ca.key -passout "pass:$PASSPHRASE" 4096
 
 # Create self-signed CA certificate.
 openssl req -new -x509 -sha256 -days 1825 -key ca.key -out ca.crt \

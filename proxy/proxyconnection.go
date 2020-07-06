@@ -424,8 +424,8 @@ func (p *ProxyConnection) PassthruAndLog(serverConn, clientConn net.Conn) error 
 	}
 }
 
-func (p *ProxyConnection) ConnectBackend(host string) (net.Conn, error) {
-	conn, err := net.Dial("tcp", host)
+func (p *ProxyConnection) ConnectBackend(hostPort string) (net.Conn, error) {
+	conn, err := net.Dial("tcp", hostPort)
 
 	if err != nil {
 		return nil, err
@@ -475,7 +475,13 @@ func (p *ProxyConnection) ConnectBackend(host string) (net.Conn, error) {
 	} else {
 		p.log.Debug("Attempting to upgrade backend connection to SSL")
 
-		sslConn := tls.Client(conn, p.c.Client.BaseTLSConfig.Clone())
+		host, _, err := net.SplitHostPort(hostPort)
+		if err != nil {
+			host = hostPort
+		}
+		tlsConfig := p.c.Client.BaseTLSConfig.Clone()
+		tlsConfig.ServerName = host
+		sslConn := tls.Client(conn, tlsConfig)
 		if err = sslConn.Handshake(); err != nil {
 			conn.Close()
 			return nil, fmt.Errorf("Error upgrading to SSL: %w", err)
