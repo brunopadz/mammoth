@@ -160,7 +160,9 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			p.log.Infof("Error reading StartupMessage after SSL handshake: %w", err)
 			return err
 		}
-	} else { // non-SSL startup packet
+	} else if version != protocol.CancelRequestCode {
+		// NB: psql does not attempt an SSL upgrade when accepting cancel packets.
+		// For this reason, we accept cancel requests even if it's not SSL
 		if p.c.Server.BaseTLSConfig != nil && p.c.Server.AllowUnencrypted == false {
 			p.log.Infof("Rejecting client without SSL because allowUnecrypted is false (version = %v)", version)
 			return nil
