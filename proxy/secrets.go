@@ -9,7 +9,8 @@ type BackendSecrets struct {
 
 type secret struct {
 	origSecret int32
-	hostPort   string
+	host       string
+	port       string
 }
 
 func NewBackendSecrets() *BackendSecrets {
@@ -19,7 +20,7 @@ func NewBackendSecrets() *BackendSecrets {
 	}
 }
 
-func (s *BackendSecrets) Add(pid, origSecret int32, hostPort string) int32 {
+func (s *BackendSecrets) Add(pid, origSecret int32, host, port string) int32 {
 	s.mtx.Lock()
 	secrets, ok := s.m[pid]
 	if !ok {
@@ -33,7 +34,8 @@ func (s *BackendSecrets) Add(pid, origSecret int32, hostPort string) int32 {
 		_, exists := secrets[newSecret]
 		if !exists {
 			secrets[newSecret] = secret{
-				hostPort:   hostPort,
+				host:       host,
+				port:       port,
 				origSecret: origSecret,
 			}
 			break

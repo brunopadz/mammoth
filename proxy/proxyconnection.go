@@ -20,7 +20,7 @@ type ProxyConnection struct {
 	secrets *BackendSecrets
 }
 
-func parseStartupMessage(r *protocol.Reader) (hostPort string, user string, newStartupMessage *protocol.Buffer, e error) {
+func parseStartupMessage(r *protocol.Reader) (host, port, user string, newStartupMessage *protocol.Buffer, e error) {
 	var database string
 	props := map[string]string{}
 
@@ -57,18 +57,28 @@ func parseStartupMessage(r *protocol.Reader) (hostPort string, user string, newS
 	}
 
 	if user == "" {
-		return "", "", nil, errors.New("user field empty")
+		e = errors.New("user field empty")
+		return
 	}
 	if database == "" {
-		return "", "", nil, errors.New("database field empty")
+		e = errors.New("database field empty")
+		return
 	}
 	// parse database: host:port/database
 	var split []string
 	split = strings.SplitN(database, "/", 2)
 	if len(split) != 2 {
-		return "", "", nil, errors.New("Database string missing /")
+		e = errors.New("Database string missing /")
+		return
 	}
-	hostPort = split[0]
+
+	hostPort := split[0]
+
+	host, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		host = hostPort
+		port = "5432"
+	}
 
 	props["database"] = split[1]
 	props["user"] = user
@@ -152,7 +162,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		}
 	} else { // non-SSL startup packet
 		if p.c.Server.BaseTLSConfig != nil && p.c.Server.AllowUnencrypted == false {
-			p.log.Info("Rejecting client without SSL because allowUnecrypted is false")
+			p.log.Infof("Rejecting client without SSL because allowUnecrypted is false (version = %v)", version)
 			return nil
 		}
 	}
@@ -175,9 +185,9 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		}
 
 		p.log.Debug("Connecting to backend for cancellation")
-		serverConn, err := p.ConnectBackend(s.hostPort)
+		serverConn, err := p.ConnectBackend(s.host, s.port)
 		if err != nil {
-			p.log.Infof("Unable to connect to backend for cancellation %v: %v", s.hostPort, err)
+			p.log.Infof("Unable to connect to backend for cancellation %v:%v: %v", s.host, s.port, err)
 		}
 		defer serverConn.Close()
 
@@ -189,7 +199,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 			return err
 		}
 
-		p.log.Infof("Successfully sent cancellation to %v, pid %v", s.hostPort, pid)
+		p.log.Infof("Successfully sent cancellation to %v:%v, pid %v", s.host, s.port, pid)
 		// In theory, the server should drop the connection immediately after, so
 		// we don't await a response, and neither should the client.
 		return nil
@@ -198,7 +208,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		return nil
 	}
 
-	hostPort, user, newStartupMessage, err := parseStartupMessage(r)
+	host, port, user, newStartupMessage, err := parseStartupMessage(r)
 	if err != nil {
 		p.log.Infof("Unable to parse startup message from client: %v", err)
 		protocol.WriteError(clientConn, protocol.Error{
@@ -212,13 +222,23 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 
 	p.log = p.log.WithFields(logrus.Fields{
 		"user":   user,
-		"server": hostPort,
+		"server": net.JoinHostPort(host, port),
 	})
 
+	if p.c.HostRegex != nil && !p.c.HostRegex.MatchString(host) {
+		p.log.Infof("Backend host %v does not match regexp %v", host)
+		protocol.WriteError(clientConn, protocol.Error{
+			Severity: protocol.ErrorSeverityFatal,
+			Code:     protocol.ErrorCodeConnectionFailure,
+			Message:  "Remote host does not match regexp",
+		})
+		return nil
+	}
+
 	p.log.Debug("Connecting to backend")
-	serverConn, err := p.ConnectBackend(hostPort)
+	serverConn, err := p.ConnectBackend(host, port)
 	if err != nil {
-		p.log.Infof("Unable to connect to backend %v: %v", hostPort, err)
+		p.log.Infof("Unable to connect to backend %v:%v: %v", host, port, err)
 		protocol.WriteError(clientConn, protocol.Error{
 			Severity: protocol.ErrorSeverityFatal,
 			Code:     protocol.ErrorCodeClientUnableToConnect,
@@ -251,7 +271,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 		close(clientDone)
 	}()
 
-	pid, secret, added, err := p.PassthruAndRewriteBackendData(clientConn, serverConn, hostPort)
+	pid, secret, added, err := p.PassthruAndRewriteBackendData(clientConn, serverConn, host, port)
 	if added {
 		defer p.secrets.Remove(pid, secret)
 	}
@@ -284,7 +304,7 @@ func (p *ProxyConnection) HandleConnection(clientConn net.Conn) error {
 // that will be written to the client. In this way, we can handle cancellation.
 // Stops copying data after the first ReadyForQuery message is received,
 // which indicates that no further BackendDataPacket will be forthcoming.
-func (p *ProxyConnection) PassthruAndRewriteBackendData(clientConn, serverConn net.Conn, hostPort string) (pid int32, secret int32, added bool, err error) {
+func (p *ProxyConnection) PassthruAndRewriteBackendData(clientConn, serverConn net.Conn, host, port string) (pid int32, secret int32, added bool, err error) {
 	msgTypeBuf := make([]byte, 1)
 
 	for {
@@ -319,7 +339,7 @@ func (p *ProxyConnection) PassthruAndRewriteBackendData(clientConn, serverConn n
 			if added {
 				p.secrets.Remove(pid, secret)
 			}
-			secret = p.secrets.Add(pid, secret, hostPort)
+			secret = p.secrets.Add(pid, secret, host, port)
 			added = true
 
 			msgOut := protocol.NewBuffer()
@@ -424,14 +444,8 @@ func (p *ProxyConnection) PassthruAndLog(serverConn, clientConn net.Conn) error 
 	}
 }
 
-func (p *ProxyConnection) ConnectBackend(hostPort string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		host = hostPort
-		port = "5432"
-		hostPort = net.JoinHostPort(host, port)
-	}
-
+func (p *ProxyConnection) ConnectBackend(host, port string) (net.Conn, error) {
+	hostPort := net.JoinHostPort(host, port)
 	conn, err := net.Dial("tcp", hostPort)
 
 	if err != nil {

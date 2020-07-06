@@ -4,3 +4,4 @@ server:
   allowUnencrypted: true
 client:
   allowUnencrypted: true
+hostRegex: "^db-\d+\.mydomain\.com$"

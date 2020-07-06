@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 
 	"github.com/twooster/pg-jump/config/file"
 )
@@ -22,14 +23,26 @@ type ServerTLSConfig struct {
 }
 
 type Config struct {
-	Bind   string
-	Client ClientTLSConfig
-	Server ServerTLSConfig
+	Bind      string
+	HostRegex *regexp.Regexp
+	Client    ClientTLSConfig
+	Server    ServerTLSConfig
 }
 
 func FromFile(f *file.Config) (*Config, error) {
+	var hostRegex *regexp.Regexp
+	var err error
+
+	if f.HostRegex != "" {
+		hostRegex, err = regexp.Compile(f.HostRegex)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	c := Config{
-		Bind: f.Bind,
+		Bind:      f.Bind,
+		HostRegex: hostRegex,
 		Client: ClientTLSConfig{
 			AllowUnencrypted: f.Client.AllowUnencrypted,
 			TrySSL:           f.Client.TrySSL,

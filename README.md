@@ -13,11 +13,9 @@ eventually become a goal.
 Supports:
 * SSL (including mTLS, skipping validations, and enforcing SSL as required)
 * Arbitrary jump-host specified by providing the database as "host:port/database"
+* Allowable remote hosts can be restricted by a regexp
 * Logging of all commands (except auth, of course) sent to the server
 * Query cancellation (by way of parsing server responses and rewriting the "backend secrets")
-
-TODO:
-* Restrict the set of allowable target hosts via a list or regex
 
 ## Ps
 
