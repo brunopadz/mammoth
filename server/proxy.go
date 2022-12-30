@@ -17,9 +17,9 @@ package server
 import (
 	"net"
 
-	"github.com/twooster/pg-jump/config"
-	"github.com/twooster/pg-jump/proxy"
-	"github.com/twooster/pg-jump/util/log"
+	"github.com/brunopadz/mammoth/config"
+	"github.com/brunopadz/mammoth/proxy"
+	"github.com/brunopadz/mammoth/util/log"
 )
 
 type ProxyServer struct {

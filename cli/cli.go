@@ -18,11 +18,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/brunopadz/mammoth/config"
+	"github.com/brunopadz/mammoth/config/file"
+	"github.com/brunopadz/mammoth/server"
+	"github.com/brunopadz/mammoth/util/log"
 	"github.com/spf13/cobra"
-	"github.com/twooster/pg-jump/config"
-	"github.com/twooster/pg-jump/config/file"
-	"github.com/twooster/pg-jump/server"
-	"github.com/twooster/pg-jump/util/log"
 )
 
 var configPath string
@@ -36,7 +36,7 @@ func init() {
 }
 
 var mainCmd = &cobra.Command{
-	Use:   "pg-jump",
+	Use:   "mammoth",
 	Short: "A simple Postgres jump server",
 	Run:   runStart,
 }

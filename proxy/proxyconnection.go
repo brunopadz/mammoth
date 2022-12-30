@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/twooster/pg-jump/config"
-	"github.com/twooster/pg-jump/protocol"
+	"github.com/brunopadz/mammoth/config"
+	"github.com/brunopadz/mammoth/protocol"
 )
 
 type ProxyConnection struct {

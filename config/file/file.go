@@ -17,7 +17,7 @@ package file
 import (
 	"github.com/spf13/viper"
 
-	"github.com/twooster/pg-jump/util/log"
+	"github.com/brunopadz/mammoth/util/log"
 )
 
 func init() {
