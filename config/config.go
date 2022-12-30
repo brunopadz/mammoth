@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"regexp"
 
-	"github.com/twooster/pg-jump/config/file"
+	"github.com/brunopadz/mammoth/config/file"
 )
 
 type ClientTLSConfig struct {

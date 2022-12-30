@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"io"
 
-	"github.com/twooster/pg-jump/protocol"
+	"github.com/brunopadz/mammoth/protocol"
 )
 
 const typeField = "type"

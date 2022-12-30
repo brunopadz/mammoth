@@ -15,7 +15,7 @@ limitations under the License.
 package main
 
 import (
-	"github.com/twooster/pg-jump/cli"
+	"github.com/brunopadz/mammoth/cli"
 )
 
 func main() {
