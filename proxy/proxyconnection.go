@@ -60,6 +60,9 @@ func parseStartupMessage(r *protocol.Reader) (host, port, user string, newStartu
 		e = errors.New("user field empty")
 		return
 	}
+
+	// Implement user check
+
 	if database == "" {
 		e = errors.New("database field empty")
 		return
