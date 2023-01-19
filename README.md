@@ -1,16 +1,11 @@
-# pg-jump: a postgres jumphost with query audit-logging
+# mammoth
 
-This project is a fork of [crunchy-proxy](https://github.com/CrunchyData/crunchy-proxy)
-to function as an administrative Postgres jump host with audit logging. It is
-useful when your administrators need direct access to databases on occasion,
-but compliance requires that you have visibility into their actions.
+> This project is a fork of [crunchy-proxy](https://github.com/CrunchyData/crunchy-proxy) and still licensed under [Apache 2.0](./LICENSE).
+>
+> For more info about Apache 2.0, read more about it [here](https://choosealicense.com/licenses/apache-2.0/).
 
-It logs all commands sent by clients for auditing purposes. It does not log
+Mammoth logs all commands sent by clients for auditing purposes. It does not log
 responses from the server, for data-protection reasons.
-
-Authentication is merely a pass-thru to the backend Postgres instance, and is
-not handled by this proxy server. This is currently a non-goal, but may
-eventually become a goal.
 
 Supports:
 * SSL (including mTLS, skipping validations, and enforcing SSL as required)
@@ -57,9 +52,3 @@ host, e.g., if pg-jump is running on port `5000` (`bind: :5000` in the
 ```
 psql -h localhost -U postgres -p 5000 localhost:5432/db-name
 ```
-
-## Ps
-
-This is not the finest code. It is the functionaly-ist code. There aren't
-tests. This product may explode at any time. No warranties, no returns.
-Please have your pets spayed and neutered.
