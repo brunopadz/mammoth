@@ -1,43 +1,91 @@
 # mammoth
 
-> This project is a fork of [crunchy-proxy](https://github.com/CrunchyData/crunchy-proxy) and still licensed under [Apache 2.0](./LICENSE).
+> This project is a fork of a fork of [crunchy-proxy](https://github.com/CrunchyData/crunchy-proxy) and 
+> still licensed under [Apache 2.0](./LICENSE).
 >
-> For more info about Apache 2.0, read more about it [here](https://choosealicense.com/licenses/apache-2.0/).
+> Read about Apache 2.0 [here](https://choosealicense.com/licenses/apache-2.0/).
 
-Mammoth logs all commands sent by clients for auditing purposes. It does not log
-responses from the server, for data-protection reasons.
+Mammoth is a proxy/jumpbox for PostgreSQL. It logs all commands sent by clients for auditing purposes. 
+For security reasons, it does not log responses from the server.
 
-Supports:
+Mammoth supports:
 * SSL (including mTLS, skipping validations, and enforcing SSL as required)
-* Arbitrary jump-host specified by providing the database as "host:port/database"
+* Arbitrary jumpbox specified by providing the database as "host:port/database"
 * Allowable remote hosts can be restricted by a regexp
-* Logging of all commands (except auth, of course) sent to the server
+* User blocking
+* Logging of all commands sent to the server
 * Query cancellation (by way of parsing server responses and rewriting the "backend secrets")
 
-## Building
+## Configuring mammoth
 
-Install a recent version of Go (I built this on 1.13), then:
+You can use one of the example config file and modify it to suit your needs.
+
+### [Config file without SSL](./examples/config.without-ssl.yaml)
+
+```yaml
+# Listening address
+bind: ":5000"
+# Log format (default: json)
+logformat: "json"
+# Redis host
+redisserver: "localhost:6379"
+# Configuration when accepting client connections
+server:
+  # To allow non-SSL upgraded connections (default: false)
+  allowUnencrypted: true
+# Configuration connecting to backend servers
+client:
+  # Whether to allow non-SSL connections to the backend (default: false)
+  allowUnencrypted: true
+  # Whether to attempt an SSL connection at all to the backend (default: true)
+  # If this is false, the value of `allowUnencrypted` does not matter
+  tryssl: false
+```
+
+### [Config file with SSL](./examples/config.with-ssl.yaml)
+
+```yaml
+# Listening address
+bind: "127.0.0.1:1234"
+# Log format (default: json)
+logformat: "json"
+# Redis host
+redisserver: "localhost:6379"
+# Configuration when accepting client connections
+server:
+  # Server certificate
+  cert: /etc/pg-jump/server.crt
+  # Server key
+  key: /etc/pg-jump/server.key
+  # CA to verify the client's cert against (if not specified, then
+  # client's cert will not be checked, if provided)
+  ca: /etc/pg-jump/ca.crt
+  # To allow non-SSL upgraded connections (default: false)
+  allowUnencrypted: true
+# Configuration connecting to backend servers
+client:
+  # Client certificate
+  cert: /etc/pg-jump/client.crt
+  # Client key
+  key: /etc/pg-jump/client.key
+  # CA to verify the server's cert against, if any
+  ca: /etc/pg-jump/ca.crt
+  # Whether to allow non-SSL connections to the backend (default: false)
+  allowUnencrypted: true
+  # Whether to attempt an SSL connection at all to the backend (default: true)
+  # If this is false, the value of `allowUnencrypted` does not matter
+  trySSL: true
+```
+
+Then you can run `mammoth` by specifying the path to config file with the `-c` flag.
+
+If you don't specify, `mammoth` will look for the file in `PWD`.
 
 ```
-go build .
+mammoth -c <path-to-config>
 ```
 
-The output executable will be in the root directory with the name `pg-jump`.
-
-## Usage
-
-Copy one of the example configs ([without SSL](./examples/config.without-ssl.yaml),
-or [with SSL](./examples/config.with-ssl.yaml)) and modify it to suit. Then you
-can run the `pg-jump` executable. By default it looks in the PWD for
-`config.yaml` and loads those values. Otherwise, you can specify:
-
-```
-pg-jump -c <path-to-config>
-```
-
-You probably want to capture the stdout output somewhere for later auditing.
-
-The program supports the following configuration options:
+Mammoth also supports the following configuration options:
 
 ```
 --config|-c <path-to-config-file>
@@ -45,10 +93,21 @@ The program supports the following configuration options:
 --log-format <plain|json>
 ```
 
-Clients can now connect to the pg-jump host. Specify the database as a complete
-host, e.g., if pg-jump is running on port `5000` (`bind: :5000` in the
-`config.yaml` file) and you have another database running on port `5432`:
+### Managing blocked users  
+
+If you wish to block users instead of managing it directly in the database, you can add 
+items to a Redis set named `users`.
+
+An API is being developed to help manage it easily.
+
+For more info about using Redis set, check their [docs](https://redis.io/docs/data-types/sets/).
+
+## Using mammoth
+
+Using mammoth is quite simple. If you're running the server on port `5000`, you can
+set mammoth server as the database server host and specify the destination database as the
+database name. For example:
 
 ```
-psql -h localhost -U postgres -p 5000 localhost:5432/db-name
+psql -h mammoth.fqdn.tld -U postgres -p 5000 my_db_server.fqdn.tld/db_name
 ```
