@@ -1,7 +1,9 @@
 # This is a basic development configuration
 bind: ":5000"
+logformat: "json"
+redisserver: "localhost:6379"
 server:
   allowUnencrypted: true
 client:
   allowUnencrypted: true
-hostRegex: "^db-\d+\.mydomain\.com$"
+  tryssl: false

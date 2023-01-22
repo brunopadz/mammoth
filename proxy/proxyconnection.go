@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/brunopadz/mammoth/util/load"
 	"io"
 	"net"
 	"strings"
@@ -56,12 +57,14 @@ func parseStartupMessage(r *protocol.Reader) (host, port, user string, newStartu
 		}
 	}
 
-	if user == "" {
-		e = errors.New("user field empty")
-		return
-	}
+	users := load.LoadProhibitedUsers()
 
-	// Implement user check
+	for _, v := range users {
+		if v == user {
+			e = errors.New("User not allowed")
+			return
+		}
+	}
 
 	if database == "" {
 		e = errors.New("database field empty")
