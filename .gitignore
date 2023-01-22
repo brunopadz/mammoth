@@ -10,3 +10,6 @@ docs/pdf
 
 *.swp
 *.retry
+
+idea*
+idea/*

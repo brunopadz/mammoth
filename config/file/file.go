@@ -44,10 +44,11 @@ type ClientConfig struct {
 }
 
 type Config struct {
-	Bind      string       `mapstructure:"bind"`
-	Server    ServerConfig `mapstructure:"server"`
-	Client    ClientConfig `mapstructure:"client"`
-	HostRegex string       `mapstructure:"hostregex"`
+	Bind        string       `mapstructure:"bind"`
+	Server      ServerConfig `mapstructure:"server"`
+	Client      ClientConfig `mapstructure:"client"`
+	HostRegex   string       `mapstructure:"hostregex"`
+	RedisServer string       `mapstructure:"redisserver"`
 }
 
 func SetConfigPath(path string) {
