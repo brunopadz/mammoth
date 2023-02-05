@@ -23,10 +23,11 @@ type ServerTLSConfig struct {
 }
 
 type Config struct {
-	Bind      string
-	HostRegex *regexp.Regexp
-	Client    ClientTLSConfig
-	Server    ServerTLSConfig
+	Bind        string
+	HostRegex   *regexp.Regexp
+	Client      ClientTLSConfig
+	Server      ServerTLSConfig
+	RedisServer string
 }
 
 func FromFile(f *file.Config) (*Config, error) {

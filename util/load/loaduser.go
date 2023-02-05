@@ -14,12 +14,14 @@ func LoadProhibitedUsers() []string {
 	c := config.Config{}
 
 	r := redis.NewClient(&redis.Options{
-		Addr: c.Bind},
+		Addr: c.RedisServer},
 	)
+
+	defer r.Close()
 
 	u, err := r.SMembers(ctx, "users").Result()
 	if err != nil {
-		errors.New("aa")
+		errors.New("Could not retrieve users from Redis")
 	}
 
 	for _, v := range u {
